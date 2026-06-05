@@ -30,7 +30,7 @@ import random
 
 # Allow shared/ imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from shared.rtp_packet import RTPPacket, PT_DYNAMIC
+from rtp_packet import RTPPacket, PT_DYNAMIC
 
 # ── Config ────────────────────────────────────────────────────────────────────
 RTSP_HOST   = '0.0.0.0'

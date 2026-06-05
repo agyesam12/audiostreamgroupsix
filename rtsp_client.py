@@ -26,7 +26,7 @@ import re
 
 # Allow shared/ imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from shared.rtp_packet import RTPPacket
+from rtp_packet import RTPPacket
 
 # ── Config ────────────────────────────────────────────────────────────────────
 SERVER_IP    = sys.argv[1] if len(sys.argv) > 1 else '127.0.0.1'
