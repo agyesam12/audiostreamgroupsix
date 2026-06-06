@@ -49,6 +49,21 @@ def _log(msg, level='info'):
         _state['log'] = _state['log'][-80:]
 
 
+def _wait_for_port(host, port, timeout=20):
+    """Poll until the TCP port is accepting connections or timeout expires."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(0.8)
+            s.connect((host, port))
+            s.close()
+            return True
+        except OSError:
+            time.sleep(0.4)
+    return False
+
+
 def _send_rtsp(method, extra_headers=None):
     global _cseq, _rtsp_sock
     if not _rtsp_sock:
@@ -138,25 +153,51 @@ def server_start(request):
     global _server_proc
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+
     with _lock:
         if _server_proc and _server_proc.poll() is None:
             return JsonResponse({'status': 'already_running', 'pid': _server_proc.pid})
+
+        # Ensure sample.wav is in the project root so rtsp_server.py finds it
         audio_path = os.path.join(BASE_DIR, 'sample.wav')
         if not os.path.exists(audio_path):
-            _log('[SERVER] Generating sample WAV file…', 'server')
+            _log('[SERVER] Generating sample WAV…', 'server')
             _generate_wav(audio_path)
-        script = os.path.join(BASE_DIR, 'rtsp_server.py')
+
+        # Also place a copy one level up (rtsp_server.py looks for '../sample.wav')
+        parent_wav = os.path.join(BASE_DIR, '..', 'sample.wav')
+        parent_wav = os.path.abspath(parent_wav)
+        if not os.path.exists(parent_wav):
+            import shutil
+            shutil.copy2(audio_path, parent_wav)
+
+        script   = os.path.join(BASE_DIR, 'rtsp_server.py')
+        log_path = os.path.join(BASE_DIR, 'rtsp_server.log')
+        log_fh   = open(log_path, 'w')
         _server_proc = subprocess.Popen(
             [sys.executable, script],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=log_fh,
+            stderr=log_fh,
+            cwd=BASE_DIR,          # run from project root so relative imports work
         )
-        time.sleep(0.7)
-        _state['server_running'] = True
-        _log(f'[SERVER] RTSP Server started  PID={_server_proc.pid}', 'server')
-        _log(f'[SERVER] Listening on  rtsp://0.0.0.0:{RTSP_PORT}/stream', 'server')
+        _log(f'[SERVER] Starting RTSP Server  PID={_server_proc.pid}', 'server')
+        _log(f'[SERVER] Output → rtsp_server.log', 'server')
+
+    # Block (outside lock) until port 8554 is ready — up to 20 s
+    _log(f'[SERVER] Waiting for port {RTSP_PORT} to open…', 'server')
+    if _wait_for_port(RTSP_IP, RTSP_PORT, timeout=20):
+        with _lock:
+            _state['server_running'] = True
+        _log(f'[SERVER] Ready  →  rtsp://0.0.0.0:{RTSP_PORT}/stream', 'server')
         _log(f'[SERVER] RTP transport  UDP:{RTP_PORT}', 'server')
-    return JsonResponse({'status': 'started', 'pid': _server_proc.pid})
+        return JsonResponse({'status': 'started', 'pid': _server_proc.pid})
+    else:
+        rc = _server_proc.poll()
+        if rc is not None:
+            _log(f'[SERVER] Process crashed (exit={rc}). See rtsp_server.log', 'error')
+            return JsonResponse({'error': f'Server crashed (exit {rc}). Check rtsp_server.log'}, status=500)
+        _log(f'[SERVER] Port {RTSP_PORT} not responding after 20 s.', 'error')
+        return JsonResponse({'error': 'Server did not open port 8554 within 20 s'}, status=500)
 
 
 @csrf_exempt
@@ -191,20 +232,28 @@ def rtsp_connect(request):
     global _rtsp_sock, _cseq
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
-    try:
-        if _rtsp_sock:
-            try: _rtsp_sock.close()
-            except Exception: pass
-        _rtsp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        _rtsp_sock.settimeout(5)
-        _rtsp_sock.connect((RTSP_IP, RTSP_PORT))
-        _cseq = 0
-        _state['rtsp_state'] = 'CONNECTED'
-        _log(f'[CLIENT] TCP connection established → {RTSP_IP}:{RTSP_PORT}', 'client')
-        return JsonResponse({'status': 'connected'})
-    except Exception as e:
-        _log(f'[ERROR]  TCP connect failed: {e}', 'error')
-        return JsonResponse({'error': str(e)}, status=500)
+
+    last_err = None
+    for attempt in range(4):        # retry up to 4 times with delay
+        try:
+            if _rtsp_sock:
+                try: _rtsp_sock.close()
+                except Exception: pass
+            _rtsp_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            _rtsp_sock.settimeout(5)
+            _rtsp_sock.connect((RTSP_IP, RTSP_PORT))
+            _cseq = 0
+            _state['rtsp_state'] = 'CONNECTED'
+            _log(f'[CLIENT] TCP connection established → {RTSP_IP}:{RTSP_PORT}', 'client')
+            return JsonResponse({'status': 'connected'})
+        except OSError as e:
+            last_err = e
+            if attempt < 3:
+                _log(f'[CLIENT] Connect attempt {attempt+1} failed — retrying…', 'error')
+                time.sleep(1.5)
+
+    _log(f'[ERROR]  TCP connect failed after 4 attempts: {last_err}', 'error')
+    return JsonResponse({'error': str(last_err)}, status=500)
 
 
 @csrf_exempt

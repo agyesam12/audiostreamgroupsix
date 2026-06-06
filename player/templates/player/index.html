@@ -365,6 +365,26 @@ input[type=range]::-webkit-slider-thumb{
 .le.info{color:#e2e8f0}
 .log-empty{color:var(--muted);font-style:italic;text-align:center;padding:2rem 0;font-size:.72rem}
 
+/* ── Toast ───────────────────────────────────────────────── */
+#toast{
+  position:fixed;bottom:1.5rem;right:1.5rem;z-index:999;
+  background:#1e1e3a;border:1px solid var(--red);border-radius:10px;
+  padding:.75rem 1.1rem;font-size:.78rem;color:#fca5a5;
+  max-width:340px;box-shadow:0 8px 32px rgba(0,0,0,.5);
+  transform:translateY(120%);transition:transform .3s ease;
+  display:flex;align-items:flex-start;gap:.6rem;
+}
+#toast.show{transform:translateY(0)}
+#toast svg{flex-shrink:0;margin-top:1px;fill:#ef4444}
+
+/* ── Spinner overlay on Launch btn ───────────────────────── */
+.btn-spinner{
+  display:inline-block;width:12px;height:12px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.3);border-top-color:#fff;
+  animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media(max-width:960px){
   .layout{grid-template-columns:1fr}
@@ -374,6 +394,12 @@ input[type=range]::-webkit-slider-thumb{
 </style>
 </head>
 <body>
+
+<!-- ── Error toast ── -->
+<div id="toast">
+  <svg width="16" height="16" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+  <span id="toast-msg"></span>
+</div>
 
 <!-- ── Header ── -->
 <header>
@@ -633,6 +659,16 @@ const S = {
 };
 const audio = document.getElementById('audio-el');
 
+// ── Toast ──────────────────────────────────────────────────────────────────
+let _toastTimer;
+function toast(msg) {
+  document.getElementById('toast-msg').textContent = msg;
+  const el = document.getElementById('toast');
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 5000);
+}
+
 // ── Fetch helpers ──────────────────────────────────────────────────────────
 const post = url => fetch(url, {method:'POST'}).then(r => r.json());
 const get  = url => fetch(url).then(r => r.json());
@@ -640,8 +676,11 @@ const wait = ms  => new Promise(r => setTimeout(r, ms));
 
 // ── Server control ─────────────────────────────────────────────────────────
 async function startServer() {
-  document.getElementById('btn-srv-start').disabled = true;
+  const btn = document.getElementById('btn-srv-start');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="btn-spinner"></span> Starting…';
   const d = await post('/api/server/start');
+  btn.innerHTML = '<svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg> Launch RTSP Server';
   if (d.status === 'started' || d.status === 'already_running') {
     S.serverOn = true;
     document.getElementById('srv-dot').classList.add('on');
@@ -651,7 +690,8 @@ async function startServer() {
     document.getElementById('btn-connect').disabled = false;
     document.getElementById('btn-play').disabled = false;
   } else {
-    document.getElementById('btn-srv-start').disabled = false;
+    btn.disabled = false;
+    toast(d.error || 'Server failed to start. Check rtsp_server.log');
   }
 }
 
@@ -686,25 +726,38 @@ async function handlePlay() {
   if (st === 'IDLE' || st === 'CONNECTED') {
     if (st === 'IDLE') {
       const c = await post('/api/rtsp/connect');
-      if (c.error) { document.getElementById('btn-play').disabled = false; return; }
+      if (c.error) {
+        toast('Connect failed: ' + c.error);
+        document.getElementById('btn-play').disabled = false; return;
+      }
       litStep('CONNECT'); await wait(350);
     }
     const d = await post('/api/rtsp/describe');
-    if (d.error) { document.getElementById('btn-play').disabled = false; return; }
+    if (d.error) {
+      toast('DESCRIBE failed: ' + d.error);
+      document.getElementById('btn-play').disabled = false; return;
+    }
     litStep('DESCRIBE'); await wait(350);
 
     const s = await post('/api/rtsp/setup');
-    if (s.error) { document.getElementById('btn-play').disabled = false; return; }
+    if (s.error) {
+      toast('SETUP failed: ' + s.error);
+      document.getElementById('btn-play').disabled = false; return;
+    }
     litStep('SETUP'); await wait(350);
 
     const p = await post('/api/rtsp/play');
-    if (p.error) { document.getElementById('btn-play').disabled = false; return; }
+    if (p.error) {
+      toast('PLAY failed: ' + p.error);
+      document.getElementById('btn-play').disabled = false; return;
+    }
     litStep('PLAY'); await wait(200); litStep('RTP');
     startAudio();
 
   } else if (st === 'PAUSED') {
     const p = await post('/api/rtsp/play');
-    if (!p.error) { litStep('PLAY'); litStep('RTP'); resumeAudio(); }
+    if (p.error) { toast('Resume failed: ' + p.error); }
+    else { litStep('PLAY'); litStep('RTP'); resumeAudio(); }
   }
 
   document.getElementById('btn-play').disabled = false;
