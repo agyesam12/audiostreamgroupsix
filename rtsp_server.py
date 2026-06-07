@@ -256,7 +256,7 @@ def handle_client(conn: socket.socket, addr, audio_file: str):
             method = req.get('method', '')
             cseq   = req['headers'].get('CSeq', '0')
 
-            print(f"[RTSP] << {method}  (CSeq {cseq})")
+            print(f"[RTSP] << {method}  (CSeq {cseq})", flush=True)
 
             # ── OPTIONS ──────────────────────────────────────────────────────
             if method == 'OPTIONS':
@@ -332,23 +332,26 @@ def handle_client(conn: socket.socket, addr, audio_file: str):
             elif method == 'TEARDOWN':
                 session.cleanup()
                 resp = rtsp_response(200, 'OK', cseq, {'Session': session_id})
-                conn.send(resp.encode())
-                print(f"[RTSP] Session {session_id} torn down.")
+                conn.sendall(resp.encode())
+                print(f"[RTSP] Session {session_id} torn down.", flush=True)
                 break
 
             else:
                 resp = rtsp_response(501, 'Not Implemented', cseq)
 
-            print(f"[RTSP] >> {resp.splitlines()[0]}")
-            conn.send(resp.encode())
+            print(f"[RTSP] >> {resp.splitlines()[0]}", flush=True)
+            conn.sendall(resp.encode())
 
-    except (ConnectionResetError, BrokenPipeError):
-        print(f"[RTSP] Client {addr} disconnected abruptly.")
+    except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
+        print(f"[RTSP] Client {addr} disconnected abruptly.", flush=True)
+
+    except Exception as e:
+        print(f"[RTSP] Handler error ({type(e).__name__}): {e}", flush=True)
 
     finally:
         session.cleanup()
         conn.close()
-        print(f"[RTSP] Connection closed: {addr}")
+        print(f"[RTSP] Connection closed: {addr}", flush=True)
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────
@@ -365,9 +368,9 @@ def run_server():
     server_sock.bind((RTSP_HOST, RTSP_PORT))
     server_sock.listen(5)
 
-    print(f"[SERVER] RTSP Server started  ->  rtsp://{RTSP_HOST}:{RTSP_PORT}/stream")
-    print(f"[SERVER] Streaming file       ->  {audio_path}")
-    print(f"[SERVER] Waiting for clients...\n")
+    print(f"[SERVER] RTSP Server started  ->  rtsp://{RTSP_HOST}:{RTSP_PORT}/stream", flush=True)
+    print(f"[SERVER] Streaming file       ->  {audio_path}", flush=True)
+    print(f"[SERVER] Waiting for clients...\n", flush=True)
 
     while True:
         conn, addr = server_sock.accept()

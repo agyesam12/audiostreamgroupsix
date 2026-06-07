@@ -83,22 +83,26 @@ def _send_rtsp(method, extra_headers=None):
     lines += ['', '']
     try:
         _rtsp_sock.sendall('\r\n'.join(lines).encode())
-        resp = b''
-        _rtsp_sock.settimeout(6)
-        while b'\r\n\r\n' not in resp:
+        data = b''
+        _rtsp_sock.settimeout(15)       # generous timeout for slow Windows startup
+        while b'\r\n\r\n' not in data:
             chunk = _rtsp_sock.recv(4096)
             if not chunk:
                 break
-            resp += chunk
-        resp_str = resp.decode('utf-8', errors='ignore')
-        m = re.search(r'Content-Length:\s*(\d+)', resp_str)
+            data += chunk
+        # Read any remaining body bytes indicated by Content-Length
+        m = re.search(rb'Content-Length:\s*(\d+)', data)
         if m:
             cl      = int(m.group(1))
-            bstart  = resp_str.find('\r\n\r\n') + 4
-            remain  = cl - (len(resp_str) - bstart)
-            if remain > 0:
-                resp_str += _rtsp_sock.recv(remain).decode('utf-8', errors='ignore')
-        return resp_str, None
+            bstart  = data.find(b'\r\n\r\n') + 4
+            remain  = cl - (len(data) - bstart)
+            while remain > 0:
+                chunk = _rtsp_sock.recv(remain)
+                if not chunk:
+                    break
+                data   += chunk
+                remain -= len(chunk)
+        return data.decode('utf-8', errors='ignore'), None
     except Exception as e:
         return None, str(e)
 
@@ -173,15 +177,22 @@ def server_start(request):
 
         script   = os.path.join(BASE_DIR, 'rtsp_server.py')
         log_path = os.path.join(BASE_DIR, 'rtsp_server.log')
-        log_fh   = open(log_path, 'w')
+        log_fh   = open(log_path, 'w', encoding='utf-8')
+
+        # -u = unbuffered stdout/stderr so every print() flushes immediately
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUTF8']       = '1'
+
         _server_proc = subprocess.Popen(
-            [sys.executable, script],
+            [sys.executable, '-u', script],
             stdout=log_fh,
             stderr=log_fh,
-            cwd=BASE_DIR,          # run from project root so relative imports work
+            cwd=BASE_DIR,
+            env=env,
         )
         _log(f'[SERVER] Starting RTSP Server  PID={_server_proc.pid}', 'server')
-        _log(f'[SERVER] Output → rtsp_server.log', 'server')
+        _log(f'[SERVER] Output -> rtsp_server.log', 'server')
 
     # Block (outside lock) until port 8554 is ready — up to 20 s
     _log(f'[SERVER] Waiting for port {RTSP_PORT} to open…', 'server')
