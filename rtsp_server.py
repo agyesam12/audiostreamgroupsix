@@ -5,11 +5,11 @@ A simplified RTSP/1.0 server that handles the core RTSP command flow
 and streams audio via RTP over UDP.
 
 RTSP Command Flow (RFC 2326):
-    Client → DESCRIBE  → Server returns SDP (session description)
-    Client → SETUP     → Server allocates RTP/UDP ports
-    Client → PLAY      → Server starts streaming RTP audio packets
-    Client → PAUSE     → Server pauses stream
-    Client → TEARDOWN  → Server closes session
+    Client --> DESCRIBE  --> Server returns SDP (session description)
+    Client --> SETUP     --> Server allocates RTP/UDP ports
+    Client --> PLAY      --> Server starts streaming RTP audio packets
+    Client --> PAUSE     --> Server pauses stream
+    Client --> TEARDOWN  --> Server closes session
 
 Run:
     python server/rtsp_server.py
@@ -46,7 +46,7 @@ class StreamSession:
 
     def __init__(self, session_id: str):
         self.session_id     = session_id
-        self.state          = 'INIT'          # INIT → READY → PLAYING → PAUSED
+        self.state          = 'INIT'          # INIT -> READY -> PLAYING -> PAUSED
         self.client_rtp_ip  = None
         self.client_rtp_port = None
         self.rtp_socket     = None
@@ -142,7 +142,7 @@ def stream_rtp(session: StreamSession, audio_file: str):
     # Timestamp increment per chunk (based on sample rate clock)
     ts_increment = CHUNK_FRAMES
 
-    print(f"[RTP] Streaming → {session.client_rtp_ip}:{session.client_rtp_port}")
+    print(f"[RTP] Streaming -> {session.client_rtp_ip}:{session.client_rtp_port}")
 
     with wave.open(audio_file, 'rb') as wf:
         while not session.stop_event.is_set():
@@ -152,7 +152,7 @@ def stream_rtp(session: StreamSession, audio_file: str):
 
             data = wf.readframes(CHUNK_FRAMES)
             if not data:
-                print("[RTP] End of audio file — stream complete.")
+                print("[RTP] End of audio file - stream complete.")
                 break
 
             pkt = RTPPacket(
@@ -168,7 +168,7 @@ def stream_rtp(session: StreamSession, audio_file: str):
                     (session.client_rtp_ip, session.client_rtp_port)
                 )
             except OSError:
-                print("[RTP] Send error — client may have disconnected.")
+                print("[RTP] Send error - client may have disconnected.")
                 break
 
             session.sequence_num = (session.sequence_num + 1) & 0xFFFF
@@ -237,7 +237,7 @@ def rtsp_response(status_code: int, status_msg: str, cseq: str,
 def handle_client(conn: socket.socket, addr, audio_file: str):
     """
     Handles one RTSP client connection in a dedicated thread.
-    Processes DESCRIBE → SETUP → PLAY → PAUSE → TEARDOWN.
+    Processes DESCRIBE -> SETUP -> PLAY -> PAUSE -> TEARDOWN.
     """
     print(f"\n[RTSP] New connection from {addr}")
 
@@ -256,7 +256,7 @@ def handle_client(conn: socket.socket, addr, audio_file: str):
             method = req.get('method', '')
             cseq   = req['headers'].get('CSeq', '0')
 
-            print(f"[RTSP] ← {method}  (CSeq {cseq})")
+            print(f"[RTSP] << {method}  (CSeq {cseq})")
 
             # ── OPTIONS ──────────────────────────────────────────────────────
             if method == 'OPTIONS':
@@ -339,7 +339,7 @@ def handle_client(conn: socket.socket, addr, audio_file: str):
             else:
                 resp = rtsp_response(501, 'Not Implemented', cseq)
 
-            print(f"[RTSP] → {resp.splitlines()[0]}")
+            print(f"[RTSP] >> {resp.splitlines()[0]}")
             conn.send(resp.encode())
 
     except (ConnectionResetError, BrokenPipeError):
@@ -357,7 +357,7 @@ def run_server():
     audio_path = os.path.abspath(AUDIO_FILE)
 
     if not os.path.exists(audio_path):
-        print(f"[SERVER] No WAV found at {audio_path} — generating test tone...")
+        print(f"[SERVER] No WAV found at {audio_path} - generating test tone...")
         generate_sample_wav(audio_path)
 
     server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -365,8 +365,8 @@ def run_server():
     server_sock.bind((RTSP_HOST, RTSP_PORT))
     server_sock.listen(5)
 
-    print(f"[SERVER] RTSP Server started  →  rtsp://{RTSP_HOST}:{RTSP_PORT}/stream")
-    print(f"[SERVER] Streaming file       →  {audio_path}")
+    print(f"[SERVER] RTSP Server started  ->  rtsp://{RTSP_HOST}:{RTSP_PORT}/stream")
+    print(f"[SERVER] Streaming file       ->  {audio_path}")
     print(f"[SERVER] Waiting for clients...\n")
 
     while True:
