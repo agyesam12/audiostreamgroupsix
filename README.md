@@ -592,15 +592,16 @@ A healthy startup log:
 
 ## Group Members
 
-| Name | Student ID | Role |
-|------|------------|------|
-|      |            |      |
-|      |            |      |
-|      |            |      |
-|      |            |      |
-|      |            |      |
-|      |            |      |
-
+| Name                 Student ID  | Role         |
+|----------------------|------------|---------------
+|Samuel Agyemang       | 1693571049 | Lead developer|
+|Victoria Akushika Kyei| 1704470797 | Asist developer|   
+|Theophilus Adu        | 1704455312 |                |     
+|Wiafe Gilbert Paakwesi| 1691668588 |                |      
+|Robert Akati lambert  |            |                |
+|Priscilla Edinam      |            |                |
+|Rejoice Fianyobge     |                             |
+|Tassan Luca Kojo      |            |                | 
 ---
 
 *Group 6 - DCIT 313 Distributed Systems*

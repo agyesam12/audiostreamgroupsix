@@ -1,0 +1,31 @@
+[SERVER] RTSP Server started  ->  rtsp://0.0.0.0:8554/stream
+[SERVER] Streaming file       ->  C:\Users\agyes\sample.wav
+[SERVER] Waiting for clients...
+
+
+[RTSP] New connection from ('127.0.0.1', 62826)
+[RTSP] << DESCRIBE  (CSeq 1)
+[RTSP] >> RTSP/1.0 200 OK
+[RTSP] << SETUP  (CSeq 2)
+[RTSP] >> RTSP/1.0 200 OK
+[RTSP] Connection closed: ('127.0.0.1', 62826)
+
+[RTSP] New connection from ('127.0.0.1', 63319)
+[RTSP] Connection closed: ('127.0.0.1', 63319)
+
+[RTSP] New connection from ('127.0.0.1', 63320)
+[RTSP] Connection closed: ('127.0.0.1', 63320)
+
+[RTSP] New connection from ('127.0.0.1', 63321)
+[RTSP] Connection closed: ('127.0.0.1', 63321)
+
+[RTSP] New connection from ('127.0.0.1', 63322)
+[RTSP] Connection closed: ('127.0.0.1', 63322)
+
+[RTSP] New connection from ('127.0.0.1', 63323)
+[RTSP] << DESCRIBE  (CSeq 1)
+[RTSP] >> RTSP/1.0 200 OK
+[RTSP] << SETUP  (CSeq 2)
+[RTSP] >> RTSP/1.0 200 OK
+[RTSP] Client ('127.0.0.1', 63323) disconnected abruptly.
+[RTSP] Connection closed: ('127.0.0.1', 63323)
