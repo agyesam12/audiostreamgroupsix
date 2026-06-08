@@ -225,11 +225,13 @@ def rtsp_response(status_code: int, status_msg: str, cseq: str,
         lines.append(f"Content-Type: application/sdp")
         lines.append(f"Content-Length: {len(body.encode())}")
 
-    lines.append('')   # blank line separates headers from body
+    # RFC 2326 requires \r\n\r\n to terminate headers.
+    # Explicit double-CRLF ensures bodyless responses (SETUP/PLAY/PAUSE/etc.)
+    # are detected immediately by the client recv loop instead of timing out.
+    result = '\r\n'.join(lines) + '\r\n\r\n'
     if body:
-        lines.append(body)
-
-    return '\r\n'.join(lines)
+        result += body
+    return result
 
 
 # ── RTSP Client Handler ───────────────────────────────────────────────────────
