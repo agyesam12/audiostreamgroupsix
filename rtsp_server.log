@@ -3,10 +3,7 @@
 [SERVER] Waiting for clients...
 
 
-[RTSP] New connection from ('127.0.0.1', 59434)
-[RTSP] Connection closed: ('127.0.0.1', 59434)
-
-[RTSP] New connection from ('127.0.0.1', 59435)
+[RTSP] New connection from ('127.0.0.1', 50783)
 [RTSP] << DESCRIBE  (CSeq 1)
 [RTSP] >> RTSP/1.0 200 OK
 [RTSP] << SETUP  (CSeq 2)
@@ -17,10 +14,10 @@
 [RTP] End of audio file - stream complete.
 [RTP] Stream thread exited.
 [RTSP] << TEARDOWN  (CSeq 4)
-[RTSP] Session 434694 torn down.
-[RTSP] Connection closed: ('127.0.0.1', 59435)
+[RTSP] Session 719567 torn down.
+[RTSP] Connection closed: ('127.0.0.1', 50783)
 
-[RTSP] New connection from ('127.0.0.1', 59436)
+[RTSP] New connection from ('127.0.0.1', 50784)
 [RTSP] << DESCRIBE  (CSeq 1)
 [RTSP] >> RTSP/1.0 200 OK
 [RTSP] << SETUP  (CSeq 2)
@@ -29,6 +26,10 @@
 [RTSP] >> RTSP/1.0 200 OK
 [RTP] Streaming -> 127.0.0.1:6970
 [RTSP] << TEARDOWN  (CSeq 4)
-[RTSP] Session 593041 torn down.
-[RTSP] Connection closed: ('127.0.0.1', 59436)
+[RTSP] Session 955675 torn down.
+[RTSP] Connection closed: ('127.0.0.1', 50784)
 [RTP] Stream thread exited.
+\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 294, in accept
+    fd, addr = self._accept()
+               ^^^^^^^^^^^^^^
+KeyboardInterrupt
