@@ -174,6 +174,10 @@ def index(request):
     return render(request, 'player/index.html')
 
 
+def docs(request):
+    return render(request, 'player/docs.html')
+
+
 @csrf_exempt
 def server_start(request):
     global _server_proc
