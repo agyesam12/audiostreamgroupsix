@@ -127,11 +127,33 @@ def _rtp_receiver():
             break
 
 
+MP3_SOURCE = os.path.join(BASE_DIR, 'Lasmid - Puul (Official Video) - Lasmid (youtube).mp3')
+
+
 def _generate_wav(path, duration=30):
+    # Prefer converting the real Lasmid track over synthesising a test tone
+    if os.path.exists(MP3_SOURCE):
+        try:
+            import miniaudio
+            decoded = miniaudio.decode_file(
+                MP3_SOURCE,
+                output_format=miniaudio.SampleFormat.SIGNED16,
+                nchannels=1,
+                sample_rate=44100,
+            )
+            with wave.open(path, 'wb') as wf:
+                wf.setnchannels(1)
+                wf.setsampwidth(2)
+                wf.setframerate(44100)
+                wf.writeframes(bytes(decoded.samples))
+            return
+        except Exception as e:
+            _log(f'[SERVER] MP3 decode failed ({e}), falling back to test tone.', 'error')
+
+    # Fallback: synthesise a 30-second musical chord
     sr  = 44100
     amp = 28000
     ns  = sr * duration
-    # Musical chord: C4 + E4 + G4 + C5 with slow tremolo
     freqs = [261.63, 329.63, 392.00, 523.25]
     with wave.open(path, 'w') as wf:
         wf.setnchannels(1)
