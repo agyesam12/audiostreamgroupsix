@@ -35,7 +35,7 @@ from rtp_packet import RTPPacket, PT_DYNAMIC
 # ── Config ────────────────────────────────────────────────────────────────────
 RTSP_HOST   = '0.0.0.0'
 RTSP_PORT   = 8554          # Standard RTSP port
-AUDIO_FILE  = os.path.join(os.path.dirname(__file__), '..', 'sample.wav')
+AUDIO_FILE  = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sample.wav')
 CHUNK_FRAMES = 1024         # Audio frames per RTP packet
 # ─────────────────────────────────────────────────────────────────────────────
 

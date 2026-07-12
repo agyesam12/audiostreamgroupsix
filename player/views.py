@@ -23,16 +23,19 @@ SONGS = {
         'title':  'Puul',
         'artist': 'Lasmid',
         'file':   'Lasmid - Puul (Official Video) - Lasmid (youtube).mp3',
+        'wav':    'puul.wav',
     },
     'do_better': {
         'title':  'Do Better',
         'artist': 'Kuami Eugene',
         'file':   'Kuami Eugene - Do Better - Kuami Eugene (youtube).mp3',
+        'wav':    'do_better.wav',
     },
     'biggest_nathaniel': {
         'title':  'Biggest Nathaniel',
         'artist': 'Lasmid',
         'file':   'Lasmid - Biggest Nathaniel (Official Lyrics Video) - AMB StudiOS (youtube).mp3',
+        'wav':    'biggest_nathaniel.wav',
     },
 }
 
@@ -148,46 +151,94 @@ def _rtp_receiver():
             break
 
 
-def _generate_wav(path, song_key=None, duration=30):
-    if song_key is None:
-        song_key = _state.get('current_song', 'puul')
+def _mp3_to_wav(mp3_path, wav_path):
+    """Convert mp3_path → wav_path (16-bit mono 44100 Hz). Returns (True, None) or (False, msg)."""
+    # Method 1: miniaudio (pure Python, no external tool)
+    try:
+        import miniaudio
+        decoded = miniaudio.decode_file(
+            mp3_path,
+            output_format=miniaudio.SampleFormat.SIGNED16,
+            nchannels=1,
+            sample_rate=44100,
+        )
+        raw = bytes(decoded.samples)
+        with wave.open(wav_path, 'wb') as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(44100)
+            wf.writeframes(raw)
+        return True, None
+    except ImportError:
+        pass
+    except Exception as e:
+        pass  # try next method
+
+    # Method 2: pydub (requires ffmpeg or libav)
+    try:
+        from pydub import AudioSegment
+        seg = AudioSegment.from_mp3(mp3_path)
+        seg = seg.set_channels(1).set_frame_rate(44100).set_sample_width(2)
+        seg.export(wav_path, format='wav')
+        return True, None
+    except ImportError:
+        pass
+    except Exception as e:
+        pass
+
+    # Method 3: ffmpeg subprocess
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-y', '-i', mp3_path,
+             '-ac', '1', '-ar', '44100', '-acodec', 'pcm_s16le', wav_path],
+            capture_output=True, timeout=300,
+        )
+        if result.returncode == 0:
+            return True, None
+    except FileNotFoundError:
+        pass
+    except Exception:
+        pass
+
+    return False, (
+        'MP3 conversion failed. Fix: open a terminal in the project folder and run:\n'
+        '  pip install miniaudio\n'
+        'then run:  python convert_songs.py'
+    )
+
+
+def _activate_song(song_key):
+    """Copy song_key's pre-converted WAV to sample.wav. Returns (True, None) or (False, msg)."""
+    import shutil
     song     = SONGS.get(song_key, SONGS['puul'])
-    mp3_path = os.path.join(BASE_DIR, song['file'])
+    wav_path = os.path.join(BASE_DIR, song['wav'])
+    if not os.path.exists(wav_path):
+        return False, (
+            f'{song["title"]}.wav not found. '
+            f'Run:  python convert_songs.py'
+        )
+    dst = os.path.join(BASE_DIR, 'sample.wav')
+    shutil.copy2(wav_path, dst)
+    return True, None
 
-    if os.path.exists(mp3_path):
-        try:
-            import miniaudio
-            decoded = miniaudio.decode_file(
-                mp3_path,
-                output_format=miniaudio.SampleFormat.SIGNED16,
-                nchannels=1,
-                sample_rate=44100,
-            )
-            with wave.open(path, 'wb') as wf:
-                wf.setnchannels(1)
-                wf.setsampwidth(2)
-                wf.setframerate(44100)
-                wf.writeframes(bytes(decoded.samples))
-            return
-        except Exception as e:
-            _log(f'[SERVER] MP3 decode failed ({e}), falling back to test tone.', 'error')
 
-    # Fallback: synthesise a 30-second musical chord
-    sr    = 44100
-    amp   = 28000
-    ns    = sr * duration
-    freqs = [261.63, 329.63, 392.00, 523.25]
-    with wave.open(path, 'w') as wf:
-        wf.setnchannels(1)
-        wf.setsampwidth(2)
-        wf.setframerate(sr)
-        buf = bytearray()
-        for i in range(ns):
-            env = 0.6 + 0.4 * math.sin(2 * math.pi * 0.3 * i / sr)
-            s   = sum(int((amp / len(freqs)) * env *
-                         math.sin(2 * math.pi * f * i / sr)) for f in freqs)
-            buf += struct.pack('<h', max(-32767, min(32767, s)))
-        wf.writeframes(bytes(buf))
+def _ensure_all_wavs():
+    """Convert every song's MP3 → named WAV (skips songs already converted)."""
+    for key, song in SONGS.items():
+        wav_path = os.path.join(BASE_DIR, song['wav'])
+        if os.path.exists(wav_path):
+            _log(f'[SONG] {song["title"]} WAV already ready', 'server')
+            continue
+        mp3_path = os.path.join(BASE_DIR, song['file'])
+        if not os.path.exists(mp3_path):
+            _log(f'[SONG] MP3 missing: {song["file"]}', 'error')
+            continue
+        _log(f'[SONG] Converting "{song["title"]}" to WAV — please wait…', 'server')
+        ok, err = _mp3_to_wav(mp3_path, wav_path)
+        if ok:
+            _log(f'[SONG] "{song["title"]}" WAV ready', 'server')
+        else:
+            _log(f'[SONG] Convert failed for "{song["title"]}": {err}', 'error')
 
 
 # ── Views ─────────────────────────────────────────────────────────────────────
@@ -214,18 +265,16 @@ def server_start(request):
         if _server_proc and _server_proc.poll() is None:
             return JsonResponse({'status': 'already_running', 'pid': _server_proc.pid})
 
-        # Ensure sample.wav is in the project root so rtsp_server.py finds it
-        audio_path = os.path.join(BASE_DIR, 'sample.wav')
-        if not os.path.exists(audio_path):
-            _log('[SERVER] Generating sample WAV…', 'server')
-            _generate_wav(audio_path)
+        # Convert all MP3s to named WAVs (skips any already done)
+        _ensure_all_wavs()
 
-        # Also place a copy one level up (rtsp_server.py looks for '../sample.wav')
-        parent_wav = os.path.join(BASE_DIR, '..', 'sample.wav')
-        parent_wav = os.path.abspath(parent_wav)
-        if not os.path.exists(parent_wav):
-            import shutil
-            shutil.copy2(audio_path, parent_wav)
+        # Copy active song's WAV to sample.wav (rtsp_server.py reads this)
+        song_key = _state.get('current_song', 'puul')
+        ok, err = _activate_song(song_key)
+        if not ok:
+            _log(f'[SERVER] Audio not ready: {err}', 'error')
+            return JsonResponse({'error': err}, status=500)
+        _log(f'[SERVER] Audio: {SONGS[song_key]["title"]} by {SONGS[song_key]["artist"]}', 'server')
 
         script   = os.path.join(BASE_DIR, 'rtsp_server.py')
         log_path = os.path.join(BASE_DIR, 'rtsp_server.log')
@@ -456,15 +505,22 @@ def song_select(request):
     _state['song_title']   = song['title']
     _state['song_artist']  = song['artist']
 
-    # Regenerate the WAV so the next server start uses the new song
-    audio_path = os.path.join(BASE_DIR, 'sample.wav')
-    try:
-        _generate_wav(audio_path, song_key=song_key)
-        _log(f'[SONG] Switched to "{song["title"]}" by {song["artist"]}', 'info')
-    except Exception as e:
-        _log(f'[SONG] WAV generation failed: {e}', 'error')
-        return JsonResponse({'error': str(e)}, status=500)
+    # If WAV not converted yet, try now (on-demand fallback)
+    wav_path = os.path.join(BASE_DIR, song['wav'])
+    if not os.path.exists(wav_path):
+        _log(f'[SONG] Converting "{song["title"]}" on-demand…', 'server')
+        ok, err = _mp3_to_wav(os.path.join(BASE_DIR, song['file']), wav_path)
+        if not ok:
+            _log(f'[SONG] Conversion failed: {err}', 'error')
+            return JsonResponse({'error': err}, status=500)
 
+    # Copy WAV → sample.wav so rtsp_server picks it up on the next stream
+    ok, err = _activate_song(song_key)
+    if not ok:
+        _log(f'[SONG] Activate failed: {err}', 'error')
+        return JsonResponse({'error': err}, status=500)
+
+    _log(f'[SONG] Switched to "{song["title"]}" by {song["artist"]}', 'info')
     return JsonResponse({'status': 'ok', 'song_key': song_key,
                          'title': song['title'], 'artist': song['artist']})
 
