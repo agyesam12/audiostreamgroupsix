@@ -1464,6 +1464,157 @@ _lock        = threading.<span class="fn">Lock</span>()</div>
 <hr class="div">
 
 <!-- ══════════════════════════════════════════════════════════
+     SECTION 9: SONG SWITCHING FEATURE
+══════════════════════════════════════════════════════════ -->
+<h2>Song Switching — Three Songs During the Demo</h2>
+
+<p>The dashboard supports three songs that can be swapped live during the presentation. This section explains the architecture behind it and exactly how to use it.</p>
+
+<h3>The Three Songs</h3>
+<div class="req-grid" style="grid-template-columns:auto auto 1fr">
+  <div class="rg-hd">Key</div>
+  <div class="rg-hd">Title &amp; Artist</div>
+  <div class="rg-hd">WAV File (pre-converted)</div>
+  <div class="rg-cell"><code>puul</code></div>
+  <div class="rg-cell built"><strong>Puul</strong> — Lasmid</div>
+  <div class="rg-cell built"><code>puul.wav</code> (14.7 MB)</div>
+  <div class="rg-cell"><code>do_better</code></div>
+  <div class="rg-cell built"><strong>Do Better</strong> — Kuami Eugene</div>
+  <div class="rg-cell built"><code>do_better.wav</code> (13.5 MB)</div>
+  <div class="rg-cell"><code>biggest_nathaniel</code></div>
+  <div class="rg-cell built"><strong>Biggest Nathaniel</strong> — Lasmid</div>
+  <div class="rg-cell built"><code>biggest_nathaniel.wav</code> (14.4 MB)</div>
+</div>
+
+<h3>Architecture Decision — Why Pre-Convert to WAV?</h3>
+<p>MP3 is a compressed format. The RTSP server streams raw PCM audio (uncompressed 16-bit samples at 44,100 Hz). Converting MP3 to PCM takes a few seconds. If we converted every time someone clicked Play, there would be a noticeable delay before streaming started.</p>
+
+<div class="phase-compare">
+  <div class="phase-box">
+    <div class="phase-hd p1">Old approach (broken)</div>
+    <div class="phase-body">
+      <ul>
+        <li>Click "Launch Server" → run miniaudio to decode MP3 → write <code>sample.wav</code></li>
+        <li>If miniaudio fails, silently fall back to a synthesised test tone</li>
+        <li>Only <code>sample.wav</code> exists — switching songs means re-running a slow decode</li>
+        <li><code>rtsp_server.py</code> looked for <code>../sample.wav</code> (wrong path)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase-box">
+    <div class="phase-hd p2">New approach (working)</div>
+    <div class="phase-body">
+      <ul>
+        <li>Run <code>python convert_songs.py</code> once → produces <code>puul.wav</code>, <code>do_better.wav</code>, <code>biggest_nathaniel.wav</code></li>
+        <li>Song switching = instant file copy (no decode)</li>
+        <li><code>rtsp_server.py</code> now looks for <code>sample.wav</code> in its own directory (correct path)</li>
+        <li>Errors are surfaced clearly instead of falling back to a tone</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<h3>How Song Switching Works (Behind the Scenes)</h3>
+
+<div class="bts">
+  <div class="bts-row">
+    <div class="bts-num">1</div>
+    <div class="bts-body">
+      <strong>Click a song button on the dashboard</strong><br>
+      JavaScript calls <code>selectSong('do_better')</code> which sends<br>
+      <code>POST /api/song/select  {"song_key": "do_better"}</code>
+    </div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-num">2</div>
+    <div class="bts-body">
+      <strong>Django <code>song_select()</code> view runs</strong><br>
+      Updates <code>_state['current_song']</code>, validates the WAV exists, then calls <code>_activate_song('do_better')</code>
+    </div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-num">3</div>
+    <div class="bts-body">
+      <strong><code>_activate_song()</code> does a file copy</strong><br>
+      <code>shutil.copy2('do_better.wav', 'sample.wav')</code> — this takes milliseconds and happens immediately
+    </div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-num">4</div>
+    <div class="bts-body">
+      <strong>Dashboard updates instantly</strong><br>
+      Track name and active song button update immediately. No server restart needed.
+    </div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-num">5</div>
+    <div class="bts-body">
+      <strong>Next PLAY streams the new song</strong><br>
+      <code>rtsp_server.py</code> opens <code>sample.wav</code> fresh each time <code>PLAY</code> is received, so the next play cycle automatically uses whichever song is currently copied there.
+    </div>
+  </div>
+</div>
+
+<div class="callout blue" style="margin-top:.8rem">
+  <strong>Key insight for the Q&amp;A:</strong> You do NOT need to restart the RTSP server to switch songs. The server reads <code>sample.wav</code> at stream time (when PLAY is received), not at startup. So: Stop &rarr; Switch song &rarr; Play = new song, same server process.
+</div>
+
+<h3>Critical Code — views.py Song Switching</h3>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><code>def _mp3_to_wav(mp3_path, wav_path):</code></div>
+    <div class="ann-explain">Tries three conversion methods in order: miniaudio (pure Python), pydub (requires ffmpeg), then ffmpeg subprocess directly. Returns <code>(True, None)</code> on success or <code>(False, error_message)</code>. Having three fallbacks means the system works regardless of which tools are installed.</div>
+  </div>
+  <div class="ann-row">
+    <div class="ann-code"><code>decoded = miniaudio.decode_file(mp3_path, output_format=SampleFormat.SIGNED16, nchannels=1, sample_rate=44100)</code></div>
+    <div class="ann-explain">The miniaudio library decodes the MP3 and resamples it to 16-bit mono at 44,100 Hz in one call — the exact format our RTP server expects. The result is a <code>DecodedSoundFile</code> whose <code>.samples</code> attribute is the raw PCM bytes.</div>
+  </div>
+  <div class="ann-row">
+    <div class="ann-code"><code>def _activate_song(song_key):</code><br><code>&nbsp;&nbsp;shutil.copy2(wav_path, dst)</code></div>
+    <div class="ann-explain">The entire "song switch" at the file level. <code>shutil.copy2</code> copies the song's dedicated WAV to <code>sample.wav</code> (also preserving timestamps). This is instant — no audio processing, just an OS file copy.</div>
+  </div>
+  <div class="ann-row">
+    <div class="ann-code"><code>def _ensure_all_wavs():</code><br><code>&nbsp;&nbsp;for key, song in SONGS.items(): ...</code></div>
+    <div class="ann-explain">Called once when "Launch Server" is clicked. Loops through all three songs and converts any MP3 that doesn't yet have a WAV. Already-converted songs are skipped. This means the first launch might be slow (conversion), but every subsequent launch is instant.</div>
+  </div>
+  <div class="ann-row">
+    <div class="ann-code"><code>@csrf_exempt<br>def song_select(request):</code></div>
+    <div class="ann-explain">The Django view that handles <code>POST /api/song/select</code>. Reads <code>{"song_key": "..."}​</code> from the JSON body, validates it, updates <code>_state</code>, and calls <code>_activate_song()</code>. Returns the song title and artist so the dashboard can update the track name immediately.</div>
+  </div>
+</div>
+
+<h3>Demo Script — Switching Songs Live</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">Click Stop &#9634; first</div>
+      <div class="step-desc">Send TEARDOWN to close the current session. The server stays running — only the audio stream ends. State returns to IDLE.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">Click a song button (e.g. "Do Better")</div>
+      <div class="step-desc"><em>"If the lecturer asks us to switch songs, we just click here."</em> The track name on the dashboard updates instantly. Behind the scenes, <code>do_better.wav</code> is copied to <code>sample.wav</code>.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">Click Play &#9654;</div>
+      <div class="step-desc">DESCRIBE &rarr; SETUP &rarr; PLAY runs as normal. The server reads the new <code>sample.wav</code> (which is now Do Better) and starts streaming it over RTP. The new song plays.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">Repeat for any of the three songs</div>
+      <div class="step-desc">Switch between Puul, Do Better, and Biggest Nathaniel at any point in the demo. No reload, no restart — just Stop &rarr; select &rarr; Play.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
      SECTION 7: COMMON QUESTIONS — LANGUAGE & IDE
 ══════════════════════════════════════════════════════════ -->
 <h2>Questions You Will Definitely Be Asked</h2>
@@ -1647,7 +1798,7 @@ _lock        = threading.<span class="fn">Lock</span>()</div>
   <div class="tp-card">
     <div class="tp-num">Live Demo</div>
     <div class="tp-title">What to show during the demo</div>
-    <div class="tp-text">Open the dashboard at <code>localhost:8000</code>. Click <strong>Launch Server</strong> — show the log: "Waiting for clients." Click <strong>Play</strong> — show the DESCRIBE → SETUP → PLAY sequence lighting up. Point to the RTP packet counter incrementing. Play <em>Puul</em> by Lasmid through the browser. Show the Protocol Flow diagram animating.</div>
+    <div class="tp-text">Open the dashboard at <code>localhost:8000</code>. Click <strong>Launch Server</strong> — show the log: "Waiting for clients." Click <strong>Play</strong> — show the DESCRIBE &rarr; SETUP &rarr; PLAY sequence lighting up. Point to the RTP packet counter incrementing. Play <em>Puul</em> by Lasmid. Then click <strong>Stop</strong>, click the <strong>Do Better</strong> song button, click <strong>Play</strong> again — demonstrate switching songs live without restarting the server. This shows the system is interactive, not just a static demo.</div>
   </div>
   <div class="tp-card">
     <div class="tp-num">If Asked</div>
@@ -1657,7 +1808,7 @@ _lock        = threading.<span class="fn">Lock</span>()</div>
 </div>
 
 <div class="callout" style="margin-top:2rem">
-  <strong>Pro tip for the demo:</strong> Have <code>python manage.py runserver</code> already running before the presentation. Open the dashboard in a browser tab. Have the <a href="/docs">/docs</a> page open in another tab. Walk through both during the presentation — show the live dashboard first (the exciting part), then explain the code using the annotated walkthrough.
+  <strong>Pro tip for the demo:</strong> Have <code>python manage.py runserver</code> already running before the presentation. Open the dashboard at <code>localhost:8000</code> in one tab and this walkthrough at <code>localhost:8000/walkthrough</code> in another. Show the live dashboard first (the exciting part — Play a song, switch to another, point at the RTP counter). Then switch tabs to this walkthrough to explain the architecture and code. The three songs (Puul, Do Better, Biggest Nathaniel) are pre-converted — song switching is instant, no restart needed.
 </div>
 
 </div><!-- .page -->
