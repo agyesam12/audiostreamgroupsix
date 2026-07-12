@@ -1,12 +1,12 @@
 [SERVER] RTSP Server started  ->  rtsp://0.0.0.0:8554/stream
-[SERVER] Streaming file       ->  C:\Users\agyes\sample.wav
+[SERVER] Streaming file       ->  C:\Users\agyes\groupsixdistributedsystemfolder\sample.wav
 [SERVER] Waiting for clients...
 
 
-[RTSP] New connection from ('127.0.0.1', 52995)
-[RTSP] Connection closed: ('127.0.0.1', 52995)
+[RTSP] New connection from ('127.0.0.1', 51961)
+[RTSP] Connection closed: ('127.0.0.1', 51961)
 
-[RTSP] New connection from ('127.0.0.1', 52996)
+[RTSP] New connection from ('127.0.0.1', 51962)
 [RTSP] << DESCRIBE  (CSeq 1)
 [RTSP] >> RTSP/1.0 200 OK
 [RTSP] << SETUP  (CSeq 2)
@@ -14,7 +14,5 @@
 [RTSP] << PLAY  (CSeq 3)
 [RTSP] >> RTSP/1.0 200 OK
 [RTP] Streaming -> 127.0.0.1:6970
-[RTP] End of audio file - stream complete.
-[RTP] Stream thread exited.
 [RTSP] << PAUSE  (CSeq 4)
 [RTSP] >> RTSP/1.0 200 OK
