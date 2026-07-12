@@ -750,6 +750,717 @@ code{font-family:'Cascadia Code','Consolas',monospace;font-size:.84em;background
 </div>
 
 
+
+<style>
+/* ── Arch diagram ──────────────────────────────────────── */
+.arch-wrap{
+  background:var(--code-bg);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:1.4rem 1.6rem;font-family:'Cascadia Code','Consolas',monospace;
+  font-size:.78rem;line-height:2;overflow-x:auto;margin:1rem 0;
+}
+/* ── Behind-the-scenes timeline ───────────────────────── */
+.bts{display:flex;flex-direction:column;gap:0;margin:1rem 0}
+.bts-row{
+  display:grid;grid-template-columns:90px 28px 1fr;
+  align-items:stretch;gap:0;
+}
+.bts-layer{
+  font-family:'Consolas',monospace;font-size:.65rem;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;
+  display:flex;align-items:center;justify-content:flex-end;
+  padding:.4rem .6rem .4rem 0;color:var(--txt2);
+}
+.bts-pipe{
+  display:flex;flex-direction:column;align-items:center;
+  position:relative;
+}
+.bts-pipe::before{
+  content:'';position:absolute;top:0;bottom:0;left:50%;
+  width:2px;background:var(--bdr);transform:translateX(-50%);
+}
+.bts-dot{
+  width:12px;height:12px;border-radius:50%;flex-shrink:0;
+  position:relative;z-index:1;margin-top:.45rem;
+  border:2px solid;
+}
+.bts-dot.browser{background:rgba(59,125,216,.2);border-color:var(--acc2)}
+.bts-dot.django {background:rgba(232,98,42,.2);border-color:var(--acc)}
+.bts-dot.os     {background:rgba(28,184,154,.2);border-color:var(--acc3)}
+.bts-dot.server {background:rgba(199,146,234,.2);border-color:var(--acc4)}
+.bts-body{
+  background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:.5rem .9rem;margin:.2rem 0 .2rem .5rem;font-size:.84rem;
+}
+.bts-body strong{color:var(--txt);display:block;margin-bottom:.1rem}
+.bts-body span{color:var(--txt2);font-size:.8rem}
+.bts-body code{font-size:.79em;background:var(--surf2);padding:.05em .28em;border-radius:3px;color:var(--acc2)}
+
+/* ── State machine ─────────────────────────────────────── */
+.sm-wrap{
+  display:flex;align-items:center;flex-wrap:wrap;gap:0;
+  margin:1rem 0;overflow-x:auto;padding-bottom:.3rem;
+}
+.sm-state{
+  background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;
+  padding:.4rem .8rem;font-family:'Consolas',monospace;font-size:.75rem;
+  font-weight:700;color:var(--txt);white-space:nowrap;
+}
+.sm-state.active{background:rgba(16,185,129,.1);border-color:rgba(16,185,129,.4);color:var(--acc3)}
+.sm-arrow{
+  display:flex;flex-direction:column;align-items:center;
+  padding:0 .4rem;min-width:70px;
+}
+.sm-arrow .sm-line{width:100%;height:2px;background:var(--bdr);margin:.5rem 0 .2rem}
+.sm-arrow .sm-cmd{font-family:'Consolas',monospace;font-size:.6rem;color:var(--acc);text-align:center;white-space:nowrap}
+
+/* ── RTP packet diagram ────────────────────────────────── */
+.rtp-hdr{
+  display:grid;font-family:'Consolas',monospace;font-size:.74rem;
+  border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;margin:1rem 0;
+}
+.rtp-row{display:grid}
+.rtp-row.row1{grid-template-columns:repeat(32,1fr)}
+.rtp-row.row2{grid-template-columns:repeat(32,1fr)}
+.rtp-row.row3{grid-template-columns:1fr}
+.rtp-row.row4{grid-template-columns:1fr}
+.rtp-row.row5{grid-template-columns:1fr}
+.rtp-bit{
+  background:var(--code-bg);border-right:1px solid var(--bdr);border-bottom:1px solid var(--bdr);
+  padding:.18rem .05rem;text-align:center;font-size:.55rem;color:var(--txt2);
+}
+.rtp-field{
+  background:var(--surf);border-right:1px solid var(--bdr);border-bottom:1px solid var(--bdr);
+  padding:.35rem .6rem;display:flex;align-items:center;justify-content:center;
+  text-align:center;
+}
+.rtp-field.ver{background:rgba(232,98,42,.08);color:var(--acc)}
+.rtp-field.pt {background:rgba(59,125,216,.08);color:var(--acc2)}
+.rtp-field.seq{background:rgba(28,184,154,.08);color:var(--acc3)}
+.rtp-field.ts {background:rgba(199,146,234,.08);color:var(--acc4)}
+.rtp-field.ssrc{background:rgba(232,162,42,.08);color:#e8a22a}
+.rtp-field.pay{background:rgba(16,185,129,.05);color:var(--acc3);font-size:.8rem}
+.rtp-label{font-weight:700;display:block;font-size:.72rem}
+.rtp-sub{display:block;font-size:.62rem;color:var(--txt2);margin-top:.1rem}
+
+/* ── SDP box ───────────────────────────────────────────── */
+.sdp-box{
+  display:grid;grid-template-columns:1fr 1fr;gap:0;
+  border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;margin:1rem 0;
+}
+@media(max-width:600px){.sdp-box{grid-template-columns:1fr}}
+.sdp-code{background:var(--code-bg);padding:.9rem 1rem;font-family:'Consolas',monospace;font-size:.76rem;line-height:1.9;border-right:2px solid var(--bdr)}
+.sdp-exp{background:var(--ann-bg);padding:.9rem 1rem;font-size:.83rem;display:flex;flex-direction:column;gap:.5rem}
+.sdp-line{display:flex;gap:.6rem;align-items:flex-start}
+.sdp-tag{font-family:'Consolas',monospace;font-size:.72rem;font-weight:700;color:var(--acc);flex-shrink:0;width:18px}
+.sdp-desc{color:var(--txt2);font-size:.82rem;line-height:1.5}
+.sdp-desc strong{color:var(--txt)}
+</style>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 5: SYSTEM ARCHITECTURE
+══════════════════════════════════════════════════════════ -->
+<h2>System Architecture — How All Pieces Connect</h2>
+
+<p>The project has three distinct layers that each have a different job. Understanding how they connect is the key to explaining the architecture to anyone — professor, classmate, or interviewer.</p>
+
+<div class="arch-wrap">
+<span class="aa">┌─────────────────────────────────────────────────────────────────────┐</span>
+<span class="aa">│                    LAYER 1 — USER INTERFACE                          │</span>
+<span class="aa">│                                                                       │</span>
+<span class="ab">│   Browser  (http://localhost:8000)                                    │</span>
+<span class="ab">│   HTML + CSS + JavaScript                                             │</span>
+<span class="ab">│   Buttons → fetch('/api/...', {method:'POST'})                        │</span>
+<span class="aa">│                         │  HTTP REST calls                            │</span>
+<span class="aa">├─────────────────────────┼───────────────────────────────────────────┤</span>
+<span class="aa">│                    LAYER 2 — DJANGO APPLICATION                       │</span>
+<span class="aa">│                                                                       │</span>
+<span class="ac">│   player/views.py   ←── acts as the RTSP CLIENT                      │</span>
+<span class="ac">│   ├── _rtsp_sock  ──────────────────────────── TCP:8554 (control) ──►│</span>
+<span class="ac">│   ├── _rtp_sock   ◄──────────────────────────── UDP:6970 (audio)  ◄──│</span>
+<span class="ac">│   ├── _server_proc (subprocess handle)                                │</span>
+<span class="ac">│   ├── _state dict  (server_running, rtsp_state, packets…)             │</span>
+<span class="ac">│   └── _lock  (threading.Lock for safe concurrent access)              │</span>
+<span class="aa">│                         │  subprocess.Popen()                         │</span>
+<span class="aa">├─────────────────────────┼───────────────────────────────────────────┤</span>
+<span class="aa">│                    LAYER 3 — RTSP SERVER PROCESS                      │</span>
+<span class="aa">│                                                                       │</span>
+<span class="ap">│   rtsp_server.py   ←── separate Python process (child of Django)      │</span>
+<span class="ap">│   ├── Listens on  TCP:8554  for RTSP commands                         │</span>
+<span class="ap">│   ├── Sends RTP audio packets  UDP → 127.0.0.1:6970                   │</span>
+<span class="ap">│   ├── Manages StreamSession objects (one per client)                   │</span>
+<span class="ap">│   └── Reads  sample.wav  (Lasmid – Puul, 44100 Hz, 16-bit mono)       │</span>
+<span class="aa">│                                                                       │</span>
+<span class="aa">│   Two channels:                                                        │</span>
+<span class="aa">│     ● TCP :8554  → reliable, ordered  — RTSP commands (text)          │</span>
+<span class="aa">│     ● UDP :6970  → low-latency, lossy — RTP audio packets (binary)    │</span>
+<span class="aa">└─────────────────────────────────────────────────────────────────────┘</span></div>
+
+<h3>Why This Three-Layer Design?</h3>
+<div class="concept">
+  <div class="concept-card">
+    <div class="icon">🌐</div>
+    <h4>Browser → Django (HTTP)</h4>
+    <p>The browser doesn't speak RTSP — it speaks HTTP. Every button click becomes a simple <code>POST</code> request to a Django REST endpoint. Django translates those into RTSP messages on the control socket.</p>
+  </div>
+  <div class="concept-card">
+    <div class="icon">🔧</div>
+    <h4>Django as RTSP Client</h4>
+    <p><code>player/views.py</code> holds module-level globals (<code>_rtsp_sock</code>, <code>_state</code>, <code>_cseq</code>). Django's dev server runs as one process, so these globals persist across HTTP requests — that is how session state survives between button clicks.</p>
+  </div>
+  <div class="concept-card">
+    <div class="icon">⚙️</div>
+    <h4>Server as Subprocess</h4>
+    <p><code>rtsp_server.py</code> is a completely independent Python process — spawned by Django with <code>subprocess.Popen()</code>. It has its own memory, its own sockets, its own threads. Django can stop it, restart it, or crash it without affecting the web UI.</p>
+  </div>
+  <div class="concept-card">
+    <div class="icon">📡</div>
+    <h4>TCP control + UDP audio</h4>
+    <p>Commands (DESCRIBE/SETUP/PLAY/PAUSE/TEARDOWN) use TCP because they must arrive correctly. Audio uses UDP because a lost audio packet is better skipped than waited for — delay is worse than a tiny glitch in music.</p>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 6: BEHIND THE SCENES
+══════════════════════════════════════════════════════════ -->
+<h2>Behind the Scenes — What Actually Happens</h2>
+
+<h3>When You Click "Launch RTSP Server"</h3>
+
+<div class="bts">
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc2)">Browser</div>
+    <div class="bts-pipe"><div class="bts-dot browser"></div></div>
+    <div class="bts-body"><strong>JavaScript calls <code>startServer()</code></strong><span>Sends <code>fetch('/api/server/start', &#123;method:'POST'&#125;)</code>. Disables the button and shows a spinner animation while waiting for the response.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>server_start()</code> acquires <code>_lock</code></strong><span>The threading lock prevents two simultaneous start requests from racing. Checks <code>_server_proc.poll() is None</code> — if the process is already alive, returns "already_running" immediately.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong>Generates <code>sample.wav</code> if missing</strong><span>Calls <code>_generate_wav()</code>: tries to decode the Lasmid MP3 with <code>miniaudio.decode_file()</code> → writes 16-bit mono WAV at 44100 Hz. If the MP3 is missing, falls back to a synthesised 30-second chord.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong>Opens <code>rtsp_server.log</code> and sets environment</strong><span>Opens the log file for stdout/stderr capture. Sets <code>PYTHONIOENCODING=utf-8</code> and <code>PYTHONUTF8=1</code> so every <code>print()</code> in the child process flushes immediately in UTF-8.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>subprocess.Popen([sys.executable, '-u', 'rtsp_server.py'])</code></strong><span>Launches a brand-new Python process. The <code>-u</code> flag = unbuffered I/O so log lines appear instantly. <code>stdout</code> and <code>stderr</code> both redirect to the log file. The handle is saved as <code>_server_proc</code>.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>_wait_for_port('127.0.0.1', 8554, timeout=20)</code></strong><span>Releases the lock, then loops: open a TCP socket → try to connect to port 8554 → if it succeeds, the server is ready. If it fails, sleep 0.4 s and try again. Gives up after 20 seconds total.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc3)">Server</div>
+    <div class="bts-pipe"><div class="bts-dot server"></div></div>
+    <div class="bts-body"><strong><code>rtsp_server.py</code> starts up in parallel</strong><span>The child process runs <code>run_server()</code>: creates a TCP socket, binds to 0.0.0.0:8554, calls <code>listen()</code>. At this point <code>_wait_for_port()</code> succeeds — the port is open.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc2)">Browser</div>
+    <div class="bts-pipe"><div class="bts-dot browser"></div></div>
+    <div class="bts-body"><strong>Django returns <code>&#123;"status":"started","pid":&lt;PID&gt;&#125;</code></strong><span>Browser receives the JSON. Turns the dot green, shows the PID, enables the Connect button. The Launch button now says the server is live.</span></div>
+  </div>
+</div>
+
+<h3>When You Click "Stop Server"</h3>
+
+<div class="bts">
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc2)">Browser</div>
+    <div class="bts-pipe"><div class="bts-dot browser"></div></div>
+    <div class="bts-body"><strong><code>stopServer()</code> → <code>POST /api/server/stop</code></strong><span>Disables the Stop button to prevent double-clicks.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>_stop_rtp.set()</code></strong><span>A threading.Event is set, signalling the background <code>_rtp_receiver()</code> thread to exit its <code>while</code> loop cleanly on the next iteration.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong>Closes <code>_rtsp_sock</code> and <code>_rtp_sock</code></strong><span>Both network sockets are closed — the TCP control connection and the UDP audio receiver. This frees the OS ports so they can be reused on the next start.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>_server_proc.terminate()</code></strong><span>Sends SIGTERM to the child Python process. The OS kills <code>rtsp_server.py</code>. All threads inside it stop. Port 8554 is freed.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong>Resets module-level state</strong><span><code>_state.update(&#123;'server_running':False, 'rtsp_state':'IDLE', 'session_id':None, 'packets_received':0, 'bytes_received':0&#125;)</code>. Resets <code>_cseq = 0</code>. Everything is clean for the next start.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc2)">Browser</div>
+    <div class="bts-pipe"><div class="bts-dot browser"></div></div>
+    <div class="bts-body"><strong>UI resets</strong><span>Dot turns red, PID clears, all RTSP buttons disabled, state chip shows IDLE, counters reset to 0.</span></div>
+  </div>
+</div>
+
+<h3>The Full RTSP Handshake (Connect → DESCRIBE → SETUP → PLAY)</h3>
+<div class="bts">
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc2)">Browser</div>
+    <div class="bts-pipe"><div class="bts-dot browser"></div></div>
+    <div class="bts-body"><strong>Connect button → <code>POST /api/rtsp/connect</code></strong><span><code>rtsp_connect()</code> opens a new TCP socket and calls <code>connect(('127.0.0.1', 8554))</code>. Retries up to 4× with 1.5 s delay if it fails. The socket is saved as <code>_rtsp_sock</code> — a persistent connection that all subsequent commands share.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong>Play ▶ → <code>POST /api/rtsp/describe</code></strong><span>Calls <code>_send_rtsp('DESCRIBE')</code> which builds the message: <code>DESCRIBE rtsp://127.0.0.1:8554/stream RTSP/1.0\r\nCSeq: 1\r\nUser-Agent: Group6RTSPPlayer/1.0\r\n\r\n</code> and sends it over <code>_rtsp_sock</code>. Then reads until <code>\r\n\r\n</code> (the end of headers), then reads Content-Length more bytes for the SDP body.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc3)">Server</div>
+    <div class="bts-pipe"><div class="bts-dot server"></div></div>
+    <div class="bts-body"><strong>Server replies with 200 OK + SDP body</strong><span><code>rtsp_server.py</code> parses the DESCRIBE command, builds an SDP string, and sends: <code>RTSP/1.0 200 OK\r\nCSeq: 1\r\nContent-Type: application/sdp\r\nContent-Length: &lt;N&gt;\r\n\r\n&lt;sdp body&gt;</code></span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>POST /api/rtsp/setup</code> — opens UDP socket</strong><span>Before sending SETUP, Django opens a UDP socket and binds it to port 6970: <code>_rtp_sock = socket.socket(AF_INET, SOCK_DGRAM); _rtp_sock.bind(('0.0.0.0', 6970))</code>. Then sends SETUP with header <code>Transport: RTP/AVP;unicast;client_port=6970-6971</code>. Server assigns a Session ID in its response.</span></div>
+  </div>
+  <div class="bts-row">
+    <div class="bts-layer" style="color:var(--acc)">Django</div>
+    <div class="bts-pipe"><div class="bts-dot django"></div></div>
+    <div class="bts-body"><strong><code>POST /api/rtsp/play</code> — starts the RTP receiver thread</strong><span>Sends PLAY over <code>_rtsp_sock</code>. Server starts sending RTP packets to UDP:6970. Django clears <code>_stop_rtp</code> and launches <code>threading.Thread(target=_rtp_receiver, daemon=True)</code>. The thread runs independently, counting packets in <code>_state['packets_received']</code>.</span></div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 7: VIEWS.PY — CRITICAL CODE LINE BY LINE
+══════════════════════════════════════════════════════════ -->
+<h2>views.py — Critical Code, Line by Line</h2>
+
+<p>This is the heart of the project. <code>player/views.py</code> plays the role of the RTSP client, the subprocess manager, and the REST API — all in one file. Here are the most important sections explained line by line.</p>
+
+<!-- MODULE-LEVEL STATE -->
+<div class="file-header" style="border-bottom-color:var(--acc);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc)"></div>
+  <span class="file-name">Module-level globals — the shared state of the entire application</span>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">_state</span> = {
+  <span class="str">'server_running'</span>: <span class="kw">False</span>,
+  <span class="str">'rtsp_state'</span>: <span class="str">'IDLE'</span>,
+  <span class="str">'session_id'</span>: <span class="kw">None</span>,
+  <span class="str">'framerate'</span>: <span class="num">44100</span>,
+  <span class="str">'channels'</span>: <span class="num">1</span>,
+  <span class="str">'packets_received'</span>: <span class="num">0</span>,
+  <span class="str">'bytes_received'</span>: <span class="num">0</span>,
+  <span class="str">'log'</span>: [],
+}</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 21–30</div>
+      <strong>A single dictionary holds all runtime state.</strong><br>
+      Django's development server runs as <em>one Python process</em>. A module-level variable is created once when Django imports the module and stays alive forever — making it perfect for storing connection state between HTTP requests.<br><br>
+      <code>rtsp_state</code> tracks the RTSP state machine: IDLE → CONNECTED → DESCRIBED → READY → PLAYING → PAUSED.<br>
+      <code>log</code> is the list that the dashboard's Event Log polls every second via <code>/api/status</code>.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">_server_proc = <span class="kw">None</span>
+_rtsp_sock   = <span class="kw">None</span>
+_rtp_sock    = <span class="kw">None</span>
+_stop_rtp    = threading.<span class="fn">Event</span>()
+_cseq        = <span class="num">0</span>
+_lock        = threading.<span class="fn">Lock</span>()</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 32–37</div>
+      <strong>Six module-level objects that live for the lifetime of the server:</strong><br>
+      <code>_server_proc</code> — the <code>subprocess.Popen</code> handle for <code>rtsp_server.py</code>. Used to check if it's still running (<code>.poll()</code>) and to kill it (<code>.terminate()</code>).<br>
+      <code>_rtsp_sock</code> — the TCP socket to port 8554. Stays open across all RTSP commands.<br>
+      <code>_rtp_sock</code> — the UDP socket bound to port 6970 that receives audio packets.<br>
+      <code>_stop_rtp</code> — a threading.Event. Set → RTP receiver thread exits. Cleared → thread runs.<br>
+      <code>_cseq</code> — the CSeq counter. RTSP requires each request to have a sequentially increasing number.<br>
+      <code>_lock</code> — a mutex that prevents concurrent server starts from creating two processes.
+    </div>
+  </div>
+</div>
+
+<!-- _log -->
+<div class="file-header" style="border-bottom-color:var(--acc2);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc2)"></div>
+  <span class="file-name">_log() — feeds the Event Log panel</span>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">_log</span>(msg, level=<span class="str">'info'</span>):
+    _state[<span class="str">'log'</span>].append({
+        <span class="str">'msg'</span>: msg,
+        <span class="str">'level'</span>: level,
+        <span class="str">'ts'</span>: time.strftime(<span class="str">'%H:%M:%S'</span>)
+    })
+    <span class="kw">if</span> <span class="fn">len</span>(_state[<span class="str">'log'</span>]) > <span class="num">120</span>:
+        _state[<span class="str">'log'</span>] = _state[<span class="str">'log'</span>][<span class="num">-80</span>:]</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 46–49</div>
+      <strong>Appends a timestamped entry to the log list, then trims it.</strong><br>
+      <code>level</code> is one of <code>'info'</code>, <code>'server'</code>, <code>'client'</code>, <code>'rtp'</code>, <code>'error'</code> — the dashboard colours each level differently (white / green / cyan / purple / red).<br>
+      <code>time.strftime('%H:%M:%S')</code> gives a human-readable timestamp for each log line.<br>
+      The trim: if the log grows beyond 120 entries, keep only the last 80. Without this, a long-running server would accumulate thousands of entries and slow down the <code>/api/status</code> polling.
+    </div>
+  </div>
+</div>
+
+<!-- _wait_for_port -->
+<div class="file-header" style="border-bottom-color:var(--acc3);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc3)"></div>
+  <span class="file-name">_wait_for_port() — the polling readiness check</span>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">_wait_for_port</span>(
+        host, port, timeout=<span class="num">20</span>):
+    deadline = time.time() + timeout
+    <span class="kw">while</span> time.time() &lt; deadline:
+        <span class="kw">try</span>:
+            s = socket.<span class="fn">socket</span>(
+                socket.AF_INET,
+                socket.SOCK_STREAM)
+            s.settimeout(<span class="num">0.8</span>)
+            s.connect((host, port))
+            s.close()
+            <span class="kw">return True</span>
+        <span class="kw">except</span> OSError:
+            time.sleep(<span class="num">0.4</span>)
+    <span class="kw">return False</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 52–64</div>
+      <strong>Busy-polls a TCP port until it accepts connections or the deadline passes.</strong><br>
+      <code>deadline = time.time() + 20</code> — sets an absolute point in time 20 seconds from now.<br>
+      <code>s.settimeout(0.8)</code> — each connection attempt waits at most 0.8 s before giving up (so the port-closed error is fast).<br>
+      <code>s.connect((host, port))</code> — attempts a real TCP connection. If the server process hasn't called <code>listen()</code> yet, this raises an <code>OSError</code> (connection refused).<br>
+      <code>s.close()</code> — immediately closes the test socket. We don't need it; we just needed to confirm the port was reachable.<br>
+      <code>time.sleep(0.4)</code> — wait 0.4 s between attempts. Total worst case: 25 polls × 0.4 s + 25 × 0.8 s = ~30 s, but the 20 s deadline cuts it off.<br>
+      Returns <code>True</code> if the port opened, <code>False</code> if the 20 s passed without success.
+    </div>
+  </div>
+</div>
+
+<!-- _send_rtsp -->
+<div class="file-header" style="border-bottom-color:var(--acc4);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc4)"></div>
+  <span class="file-name">_send_rtsp() — builds and sends every RTSP message</span>
+</div>
+
+<div class="ann-block">
+  <div class="ann-section">Part 1 — Build the request</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">_send_rtsp</span>(
+        method, extra_headers=<span class="kw">None</span>):
+    <span class="kw">global</span> _cseq, _rtsp_sock
+    <span class="kw">if not</span> _rtsp_sock:
+        <span class="kw">return None</span>, <span class="str">'Not connected'</span>
+    _cseq += <span class="num">1</span>
+    url = <span class="fn">f</span><span class="str">'rtsp://{RTSP_IP}:{RTSP_PORT}/stream'</span>
+    lines = [
+        <span class="fn">f</span><span class="str">'{method} {url} RTSP/1.0'</span>,
+        <span class="fn">f</span><span class="str">'CSeq: {_cseq}'</span>,
+        <span class="str">'User-Agent: Group6RTSPPlayer/1.0'</span>,
+    ]
+    <span class="kw">if</span> _state.get(<span class="str">'session_id'</span>):
+        lines.append(
+            <span class="fn">f</span><span class="str">"Session: {_state['session_id']}"</span>)
+    <span class="kw">if</span> extra_headers:
+        <span class="kw">for</span> k, v <span class="kw">in</span> extra_headers.items():
+            lines.append(<span class="fn">f</span><span class="str">'{k}: {v}'</span>)
+    lines += [<span class="str">''</span>, <span class="str">''</span>]</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 67–83</div>
+      <strong>Constructs a valid RTSP/1.0 request from a method name:</strong><br>
+      <code>global _cseq</code> — declares that this function modifies the module-level counter.<br>
+      <code>_cseq += 1</code> — RTSP requires every request to have a monotonically increasing CSeq number. This is how the server matches responses to requests.<br>
+      The <code>lines</code> list builds headers one by one. Each header is a key-value pair.<br>
+      <code>if _state.get('session_id')</code> — after SETUP, every subsequent request must include the Session header. Without it, the server won't know which session to operate on.<br>
+      <code>lines += ['', '']</code> — appending two empty strings means <code>'\r\n'.join(lines)</code> produces <code>...last-header\r\n\r\n</code> — the mandatory double-CRLF that tells the server the header block is finished.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-section">Part 2 — Send and receive the response</div>
+  <div class="ann-row">
+    <div class="ann-code">    _rtsp_sock.sendall(
+        <span class="str">'\r\n'</span>.join(lines).encode())
+    data = <span class="fn">b</span><span class="str">''</span>
+    _rtsp_sock.settimeout(<span class="num">15</span>)
+    <span class="kw">while</span> <span class="fn">b</span><span class="str">'\r\n\r\n'</span> <span class="kw">not in</span> data:
+        chunk = _rtsp_sock.recv(<span class="num">4096</span>)
+        <span class="kw">if not</span> chunk: <span class="kw">break</span>
+        data += chunk</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 85–92</div>
+      <strong>Sends the request and reads the response headers:</strong><br>
+      <code>sendall()</code> guarantees every byte is sent — unlike <code>send()</code> which may only send part of the data on a busy network.<br>
+      <code>.encode()</code> converts the Python string to bytes (UTF-8) because sockets only transmit bytes.<br>
+      <code>settimeout(15)</code> — if the server doesn't respond within 15 seconds, raise a timeout exception rather than blocking forever.<br>
+      <code>while b'\r\n\r\n' not in data</code> — keeps reading until the response header block terminator is seen. This is the loop that was broken before the double-CRLF fix: SETUP responses without <code>\r\n\r\n</code> would make this loop hang until the 15-second timeout.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-section">Part 3 — Read the response body (for DESCRIBE)</div>
+  <div class="ann-row">
+    <div class="ann-code">    m = re.search(
+        <span class="fn">rb</span><span class="str">'Content-Length:\s*(\d+)'</span>,
+        data)
+    <span class="kw">if</span> m:
+        cl     = <span class="fn">int</span>(m.group(<span class="num">1</span>))
+        bstart = data.find(<span class="fn">b</span><span class="str">'\r\n\r\n'</span>) + <span class="num">4</span>
+        remain = cl - (<span class="fn">len</span>(data) - bstart)
+        <span class="kw">while</span> remain > <span class="num">0</span>:
+            chunk = _rtsp_sock.recv(remain)
+            <span class="kw">if not</span> chunk: <span class="kw">break</span>
+            data   += chunk
+            remain -= <span class="fn">len</span>(chunk)
+    <span class="kw">return</span> data.decode(<span class="str">'utf-8'</span>,
+        errors=<span class="str">'ignore'</span>), <span class="kw">None</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 94–107</div>
+      <strong>Reads the SDP body after the headers for DESCRIBE responses:</strong><br>
+      <code>re.search(rb'Content-Length:\s*(\d+)', data)</code> — uses a regex on raw bytes to find the Content-Length header value. The <code>rb</code> prefix means "raw bytes regex".<br>
+      <code>bstart = data.find(b'\r\n\r\n') + 4</code> — finds where the body starts (4 bytes after the double-CRLF).<br>
+      <code>remain = cl - (len(data) - bstart)</code> — calculates how many body bytes we still need to read. Some may have already arrived with the headers.<br>
+      The inner <code>while remain > 0</code> loop reads exactly the right number of bytes — no more, no less.<br>
+      <code>errors='ignore'</code> — if any non-UTF-8 bytes sneak in, skip them rather than crashing.
+    </div>
+  </div>
+</div>
+
+<!-- _rtp_receiver -->
+<div class="file-header" style="border-bottom-color:var(--acc3);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc3)"></div>
+  <span class="file-name">_rtp_receiver() — the background audio packet counter</span>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">_rtp_receiver</span>():
+    <span class="kw">from</span> rtp_packet <span class="kw">import</span> RTPPacket
+    <span class="kw">while not</span> _stop_rtp.is_set():
+        <span class="kw">try</span>:
+            <span class="kw">if not</span> _rtp_sock: <span class="kw">break</span>
+            data, _ = _rtp_sock.<span class="fn">recvfrom</span>(<span class="num">65535</span>)
+            pkt = RTPPacket.<span class="fn">from_bytes</span>(data)
+            _state[<span class="str">'packets_received'</span>] += <span class="num">1</span>
+            _state[<span class="str">'bytes_received'</span>] += <span class="fn">len</span>(pkt.payload)
+        <span class="kw">except</span> socket.timeout:
+            <span class="kw">continue</span>
+        <span class="kw">except</span> (OSError, ValueError):
+            <span class="kw">break</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 110–127</div>
+      <strong>Runs as a daemon thread after PLAY is sent. Counts every RTP packet the server sends:</strong><br>
+      <code>_stop_rtp.is_set()</code> — checks the threading.Event. The PAUSE and TEARDOWN handlers call <code>_stop_rtp.set()</code> to signal this loop to stop.<br>
+      <code>_rtp_sock.recvfrom(65535)</code> — blocks waiting for the next UDP datagram (up to 64 KB). Returns both the data and the sender's address (which we ignore with <code>_</code>).<br>
+      <code>RTPPacket.from_bytes(data)</code> — parses the 12-byte RTP header to extract the payload. This validates that we're receiving properly structured RTP packets, not just random UDP noise.<br>
+      <code>_state['packets_received'] += 1</code> — the dashboard polls this via <code>/api/status</code> and shows the incrementing counter.<br>
+      <code>except socket.timeout: continue</code> — the socket has a 2 s timeout. A timeout just means no packet arrived in 2 s — not an error, so we loop back.
+    </div>
+  </div>
+</div>
+
+<!-- rtsp_setup -->
+<div class="file-header" style="border-bottom-color:var(--acc2);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc2)"></div>
+  <span class="file-name">rtsp_setup() — opens the UDP audio socket and gets a Session ID</span>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">rtsp_setup</span>(request):
+    <span class="kw">global</span> _rtp_sock
+    _rtp_sock = socket.<span class="fn">socket</span>(
+        socket.AF_INET,
+        socket.SOCK_DGRAM)
+    _rtp_sock.bind((<span class="str">'0.0.0.0'</span>, RTP_PORT))
+    _rtp_sock.settimeout(<span class="num">2.0</span>)
+
+    transport = (
+        <span class="fn">f</span><span class="str">'RTP/AVP;unicast;'</span>
+        <span class="fn">f</span><span class="str">'client_port={RTP_PORT}-{RTP_PORT+1}'</span>
+    )
+    resp, err = <span class="fn">_send_rtsp</span>(
+        <span class="str">'SETUP'</span>, {<span class="str">'Transport'</span>: transport})
+
+    m = re.search(<span class="str">r'Session:\s*(\S+)'</span>, resp)
+    <span class="kw">if</span> m:
+        _state[<span class="str">'session_id'</span>] = \
+            m.group(<span class="num">1</span>).split(<span class="str">';'</span>)[<span class="num">0</span>]
+    _state[<span class="str">'rtsp_state'</span>] = <span class="str">'READY'</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 317–344</div>
+      <strong>Two things happen here: a UDP socket is created AND the server allocates a session:</strong><br>
+      <code>socket.SOCK_DGRAM</code> — creates a UDP socket (not TCP). UDP is connectionless: no handshake, packets just arrive.<br>
+      <code>_rtp_sock.bind(('0.0.0.0', 6970))</code> — registers our program with the OS to receive UDP packets on port 6970. Without binding, the server's packets would have nowhere to land.<br>
+      <code>settimeout(2.0)</code> — <code>recvfrom()</code> in the receiver thread will wake up every 2 seconds so it can check <code>_stop_rtp</code>.<br>
+      <code>Transport: RTP/AVP;unicast;client_port=6970-6971</code> — tells the server: "I'm a unicast client, send RTP to my port 6970 and RTCP to 6971."<br>
+      <code>re.search(r'Session:\s*(\S+)', resp)</code> — extracts the session ID from the server's response header. The <code>.split(';')[0]</code> strips any timeout parameter like <code>;timeout=60</code> that some servers append.
+    </div>
+  </div>
+</div>
+
+<!-- rtsp_play -->
+<div class="file-header" style="border-bottom-color:var(--acc3);margin-top:1.5rem">
+  <div class="file-dot" style="background:var(--acc3)"></div>
+  <span class="file-name">rtsp_play() — sends PLAY and launches the RTP receiver thread</span>
+</div>
+
+<div class="ann-block last">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">rtsp_play</span>(request):
+    <span class="kw">global</span> _stop_rtp
+    resp, err = <span class="fn">_send_rtsp</span>(<span class="str">'PLAY'</span>)
+
+    _state[<span class="str">'rtsp_state'</span>] = <span class="str">'PLAYING'</span>
+    _stop_rtp.clear()
+    threading.<span class="cls">Thread</span>(
+        target=_rtp_receiver,
+        daemon=<span class="kw">True</span>
+    ).start()</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 348–363</div>
+      <strong>Sends the PLAY command then launches a background thread to count incoming audio packets:</strong><br>
+      <code>_send_rtsp('PLAY')</code> sends the PLAY request. At this point, the server starts immediately sending RTP packets to our UDP port 6970.<br>
+      <code>_stop_rtp.clear()</code> — clears the stop signal so the new thread won't exit immediately. (A previous PAUSE call sets it; we must clear it before starting the receiver again.)<br>
+      <code>threading.Thread(target=_rtp_receiver, daemon=True)</code> — creates a new thread. <code>daemon=True</code> means this thread will be killed automatically if the main process (Django) exits, preventing it from keeping the program alive after shutdown.<br>
+      <code>.start()</code> — starts the thread immediately. It runs <code>_rtp_receiver()</code> concurrently with Django's HTTP handling. The two communicate only through <code>_state</code>, <code>_stop_rtp</code>, and <code>_rtp_sock</code> — all module-level globals.
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 8: KEY TECHNICAL CONCEPTS
+══════════════════════════════════════════════════════════ -->
+<h2>Key Technical Concepts — What to Know Cold</h2>
+
+<h3>The RTSP State Machine</h3>
+<p>RTSP defines a strict state machine. You cannot PLAY before SETUP, and you cannot SETUP before DESCRIBE. The server enforces this — an out-of-order command returns a 4xx error.</p>
+
+<div class="sm-wrap">
+  <div class="sm-state">INIT / IDLE</div>
+  <div class="sm-arrow">
+    <div class="sm-line"></div>
+    <div class="sm-cmd">CONNECT (TCP)</div>
+  </div>
+  <div class="sm-state">CONNECTED</div>
+  <div class="sm-arrow">
+    <div class="sm-line"></div>
+    <div class="sm-cmd">DESCRIBE</div>
+  </div>
+  <div class="sm-state">DESCRIBED</div>
+  <div class="sm-arrow">
+    <div class="sm-line"></div>
+    <div class="sm-cmd">SETUP</div>
+  </div>
+  <div class="sm-state active">READY</div>
+  <div class="sm-arrow">
+    <div class="sm-line"></div>
+    <div class="sm-cmd">PLAY</div>
+  </div>
+  <div class="sm-state active">PLAYING</div>
+  <div class="sm-arrow">
+    <div class="sm-line"></div>
+    <div class="sm-cmd">PAUSE / PLAY</div>
+  </div>
+  <div class="sm-state">PAUSED</div>
+  <div class="sm-arrow">
+    <div class="sm-line"></div>
+    <div class="sm-cmd">TEARDOWN</div>
+  </div>
+  <div class="sm-state">INIT / IDLE</div>
+</div>
+
+<h3>The RTP Packet — 12-Byte Header + Audio Payload</h3>
+<p>Every audio packet sent from the server follows the RFC 3550 RTP format. Our <code>rtp_packet.py</code> builds and parses this header using <code>struct.pack('!BBHII', ...)</code>.</p>
+
+<div class="rtp-hdr">
+  <!-- bit ruler -->
+  <div class="rtp-row row1">
+    <div class="rtp-bit" style="grid-column:1/3">0–1</div>
+    <div class="rtp-bit" style="grid-column:3/4">2</div>
+    <div class="rtp-bit" style="grid-column:4/5">3</div>
+    <div class="rtp-bit" style="grid-column:5/9">4–7</div>
+    <div class="rtp-bit" style="grid-column:9/10">8</div>
+    <div class="rtp-bit" style="grid-column:10/17">9–15</div>
+    <div class="rtp-bit" style="grid-column:17/33">16–31</div>
+  </div>
+  <!-- row 1 fields -->
+  <div class="rtp-row row1">
+    <div class="rtp-field ver" style="grid-column:1/3"><span class="rtp-label">V=2</span><span class="rtp-sub">Version</span></div>
+    <div class="rtp-field" style="grid-column:3/4"><span class="rtp-label">P</span><span class="rtp-sub">Pad</span></div>
+    <div class="rtp-field" style="grid-column:4/5"><span class="rtp-label">X</span><span class="rtp-sub">Ext</span></div>
+    <div class="rtp-field" style="grid-column:5/9"><span class="rtp-label">CC=0</span><span class="rtp-sub">CSRC count</span></div>
+    <div class="rtp-field" style="grid-column:9/10"><span class="rtp-label">M</span><span class="rtp-sub">Mark</span></div>
+    <div class="rtp-field pt" style="grid-column:10/17"><span class="rtp-label">PT=96</span><span class="rtp-sub">Payload Type</span></div>
+    <div class="rtp-field seq" style="grid-column:17/33"><span class="rtp-label">Sequence Number</span><span class="rtp-sub">Increments every packet — detects loss</span></div>
+  </div>
+  <!-- row 2 -->
+  <div class="rtp-row row3">
+    <div class="rtp-field ts"><span class="rtp-label">Timestamp (32 bits)</span><span class="rtp-sub">Audio sample position — used to synchronise playback timing</span></div>
+  </div>
+  <!-- row 3 -->
+  <div class="rtp-row row4">
+    <div class="rtp-field ssrc"><span class="rtp-label">SSRC — Synchronisation Source (32 bits)</span><span class="rtp-sub">Random unique ID of the sender — identifies which stream this packet belongs to</span></div>
+  </div>
+  <!-- payload -->
+  <div class="rtp-row row5">
+    <div class="rtp-field pay"><span class="rtp-label">PCM Audio Payload (variable)</span><span class="rtp-sub">Raw 16-bit signed samples at 44,100 Hz — L16 / PT=96 / 1024 frames per packet ≈ 2048 bytes</span></div>
+  </div>
+</div>
+
+<div class="callout blue" style="margin-top:.5rem">
+  <strong>PT = 96 (Dynamic):</strong> Payload types 0–95 are statically assigned by IANA (e.g. PT=0 = G.711 µ-law, PT=8 = G.711 A-law). PT=96–127 are dynamic — you define what they mean in the SDP. Our SDP says <code>a=rtpmap:96 L16/44100/1</code>, which means "PT 96 = raw 16-bit PCM, 44100 Hz, 1 channel."
+</div>
+
+<h3>What the SDP Body Actually Looks Like</h3>
+<p>When you send DESCRIBE, the server responds with a 200 OK and an SDP body that describes everything about the stream. Here is what our server sends and what each line means:</p>
+
+<div class="sdp-box">
+  <div class="sdp-code"><span class="cmt">v=0</span>
+<span class="cmt">o=- 0 0 IN IP4 0.0.0.0</span>
+<span class="cmt">s=Group6 Audio Stream</span>
+<span class="cmt">t=0 0</span>
+<span class="cmt">m=audio 6970 RTP/AVP 96</span>
+<span class="cmt">a=rtpmap:96 L16/44100/1</span></div>
+  <div class="sdp-exp">
+    <div class="sdp-line"><span class="sdp-tag">v=</span><span class="sdp-desc"><strong>Protocol version.</strong> Always 0 for SDP.</span></div>
+    <div class="sdp-line"><span class="sdp-tag">o=</span><span class="sdp-desc"><strong>Origin.</strong> Username, session ID, version, network type, address type, address. The <code>-</code> means anonymous.</span></div>
+    <div class="sdp-line"><span class="sdp-tag">s=</span><span class="sdp-desc"><strong>Session name.</strong> Human-readable name for this stream — "Group6 Audio Stream."</span></div>
+    <div class="sdp-line"><span class="sdp-tag">t=</span><span class="sdp-desc"><strong>Timing.</strong> Start and stop times as NTP timestamps. <code>0 0</code> = permanent / no fixed schedule.</span></div>
+    <div class="sdp-line"><span class="sdp-tag">m=</span><span class="sdp-desc"><strong>Media description.</strong> <code>audio</code> type, port <code>6970</code>, transport <code>RTP/AVP</code>, payload type <code>96</code>. This is the core line — it tells the client where and how the audio will arrive.</span></div>
+    <div class="sdp-line"><span class="sdp-tag">a=</span><span class="sdp-desc"><strong>Attribute — codec mapping.</strong> Defines what PT 96 means: <code>L16</code> (raw 16-bit PCM), <code>44100</code> Hz sample rate, <code>1</code> channel (mono). Without this, the client wouldn't know how to decode the packets.</span></div>
+  </div>
+</div>
+
+<div class="callout green" style="margin-top:.5rem">
+  <strong>Why SDP matters for the presentation:</strong> SDP is what makes RTSP interoperable. If you replaced our custom server with a VLC RTSP server, our client could still work — it would just read the SDP and adapt. That is the power of a standard protocol over Phase 1's custom metadata line.
+</div>
+
+
 <hr class="div">
 
 <!-- ══════════════════════════════════════════════════════════
