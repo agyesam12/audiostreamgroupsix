@@ -18,15 +18,36 @@ if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
 # ── Module-level state (safe for Django dev server single-process) ────────────
+SONGS = {
+    'puul': {
+        'title':  'Puul',
+        'artist': 'Lasmid',
+        'file':   'Lasmid - Puul (Official Video) - Lasmid (youtube).mp3',
+    },
+    'do_better': {
+        'title':  'Do Better',
+        'artist': 'Kuami Eugene',
+        'file':   'Kuami Eugene - Do Better - Kuami Eugene (youtube).mp3',
+    },
+    'biggest_nathaniel': {
+        'title':  'Biggest Nathaniel',
+        'artist': 'Lasmid',
+        'file':   'Lasmid - Biggest Nathaniel (Official Lyrics Video) - AMB StudiOS (youtube).mp3',
+    },
+}
+
 _state = {
-    'server_running': False,
-    'rtsp_state': 'IDLE',
-    'session_id': None,
-    'framerate': 44100,
-    'channels': 1,
-    'packets_received': 0,
-    'bytes_received': 0,
-    'log': [],
+    'server_running':    False,
+    'rtsp_state':        'IDLE',
+    'session_id':        None,
+    'framerate':         44100,
+    'channels':          1,
+    'packets_received':  0,
+    'bytes_received':    0,
+    'log':               [],
+    'current_song':      'puul',
+    'song_title':        'Puul',
+    'song_artist':       'Lasmid',
 }
 
 _server_proc = None
@@ -127,16 +148,17 @@ def _rtp_receiver():
             break
 
 
-MP3_SOURCE = os.path.join(BASE_DIR, 'Lasmid - Puul (Official Video) - Lasmid (youtube).mp3')
+def _generate_wav(path, song_key=None, duration=30):
+    if song_key is None:
+        song_key = _state.get('current_song', 'puul')
+    song     = SONGS.get(song_key, SONGS['puul'])
+    mp3_path = os.path.join(BASE_DIR, song['file'])
 
-
-def _generate_wav(path, duration=30):
-    # Prefer converting the real Lasmid track over synthesising a test tone
-    if os.path.exists(MP3_SOURCE):
+    if os.path.exists(mp3_path):
         try:
             import miniaudio
             decoded = miniaudio.decode_file(
-                MP3_SOURCE,
+                mp3_path,
                 output_format=miniaudio.SampleFormat.SIGNED16,
                 nchannels=1,
                 sample_rate=44100,
@@ -151,9 +173,9 @@ def _generate_wav(path, duration=30):
             _log(f'[SERVER] MP3 decode failed ({e}), falling back to test tone.', 'error')
 
     # Fallback: synthesise a 30-second musical chord
-    sr  = 44100
-    amp = 28000
-    ns  = sr * duration
+    sr    = 44100
+    amp   = 28000
+    ns    = sr * duration
     freqs = [261.63, 329.63, 392.00, 523.25]
     with wave.open(path, 'w') as wf:
         wf.setnchannels(1)
