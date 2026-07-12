@@ -393,6 +393,24 @@ input[type=range]::-webkit-slider-thumb{
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 
+/* ── Song Switcher ───────────────────────────────────────── */
+.song-switcher{
+  display:flex;gap:.55rem;margin-bottom:.85rem;flex-wrap:wrap;justify-content:center;
+}
+.ss-btn{
+  display:flex;flex-direction:column;align-items:center;
+  padding:.42rem .75rem;border-radius:9px;cursor:pointer;
+  background:var(--card2);border:1px solid rgba(255,255,255,.08);
+  transition:all .2s;min-width:90px;
+}
+.ss-btn:hover{border-color:var(--primary);background:rgba(124,58,237,.1)}
+.ss-btn.active{
+  border-color:var(--cyan);background:rgba(6,182,212,.1);
+  box-shadow:0 0 10px rgba(6,182,212,.2);
+}
+.ss-title{font-size:.72rem;font-weight:700;color:var(--text);line-height:1.2}
+.ss-artist{font-size:.6rem;color:var(--muted);margin-top:.1rem}
+
 /* ── Responsive ──────────────────────────────────────────── */
 @media(max-width:960px){
   .layout{grid-template-columns:1fr}
@@ -485,7 +503,7 @@ input[type=range]::-webkit-slider-thumb{
     </div>
 
     <div class="track-tag">Live RTP Stream</div>
-    <div class="track-name">Puul &mdash; Lasmid</div>
+    <div class="track-name" id="track-name">Puul &mdash; Lasmid</div>
     <div class="track-sub" id="track-sub">L16 &middot; 44,100 Hz &middot; Mono</div>
     <div class="rtsp-url">rtsp://127.0.0.1:8554/stream</div>
 

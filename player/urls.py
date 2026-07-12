@@ -15,4 +15,5 @@ urlpatterns = [
     path('api/rtsp/teardown',   views.rtsp_teardown),
     path('api/status',          views.api_status),
     path('api/audio',           views.audio_serve),
+    path('api/song/select',     views.song_select),
 ]

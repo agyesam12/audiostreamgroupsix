@@ -428,7 +428,45 @@ def rtsp_teardown(request):
 
 
 def api_status(request):
-    return JsonResponse(_state)
+    data = dict(_state)
+    data['songs'] = {k: {'title': v['title'], 'artist': v['artist']} for k, v in SONGS.items()}
+    return JsonResponse(data)
+
+
+@csrf_exempt
+def song_select(request):
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    import json
+    try:
+        body     = json.loads(request.body)
+        song_key = body.get('song_key', '').strip()
+    except Exception:
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+
+    if song_key not in SONGS:
+        return JsonResponse({'error': f'Unknown song key: {song_key}'}, status=400)
+
+    song = SONGS[song_key]
+    mp3_path = os.path.join(BASE_DIR, song['file'])
+    if not os.path.exists(mp3_path):
+        return JsonResponse({'error': f'Audio file not found: {song["file"]}'}, status=404)
+
+    _state['current_song'] = song_key
+    _state['song_title']   = song['title']
+    _state['song_artist']  = song['artist']
+
+    # Regenerate the WAV so the next server start uses the new song
+    audio_path = os.path.join(BASE_DIR, 'sample.wav')
+    try:
+        _generate_wav(audio_path, song_key=song_key)
+        _log(f'[SONG] Switched to "{song["title"]}" by {song["artist"]}', 'info')
+    except Exception as e:
+        _log(f'[SONG] WAV generation failed: {e}', 'error')
+        return JsonResponse({'error': str(e)}, status=500)
+
+    return JsonResponse({'status': 'ok', 'song_key': song_key,
+                         'title': song['title'], 'artist': song['artist']})
 
 
 def audio_serve(request):
