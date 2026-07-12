@@ -507,6 +507,22 @@ input[type=range]::-webkit-slider-thumb{
     <div class="track-sub" id="track-sub">L16 &middot; 44,100 Hz &middot; Mono</div>
     <div class="rtsp-url">rtsp://127.0.0.1:8554/stream</div>
 
+    <!-- Song Switcher -->
+    <div class="song-switcher" id="song-switcher">
+      <div class="ss-btn active" id="ss-puul" onclick="selectSong('puul')">
+        <span class="ss-title">Puul</span>
+        <span class="ss-artist">Lasmid</span>
+      </div>
+      <div class="ss-btn" id="ss-do_better" onclick="selectSong('do_better')">
+        <span class="ss-title">Do Better</span>
+        <span class="ss-artist">Kuami Eugene</span>
+      </div>
+      <div class="ss-btn" id="ss-biggest_nathaniel" onclick="selectSong('biggest_nathaniel')">
+        <span class="ss-title">Biggest Nathaniel</span>
+        <span class="ss-artist">Lasmid</span>
+      </div>
+    </div>
+
     <!-- Equalizer -->
     <div class="eq-row" id="eq-row">
       <div class="eq"></div><div class="eq"></div><div class="eq"></div><div class="eq"></div>
@@ -947,6 +963,26 @@ function resetFlow() {
   });
 }
 
+// ── Song switching ─────────────────────────────────────────────────────────
+async function selectSong(key) {
+  const d = await fetch('/api/song/select', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({song_key: key}),
+  }).then(r => r.json());
+
+  if (d.error) { toast(d.error); return; }
+
+  // Update active button
+  document.querySelectorAll('.ss-btn').forEach(b => b.classList.remove('active'));
+  const btn = document.getElementById(`ss-${key}`);
+  if (btn) btn.classList.add('active');
+
+  // Update track name display
+  const tn = document.getElementById('track-name');
+  if (tn) tn.textContent = `${d.title} — ${d.artist}`;
+}
+
 // ── Status polling ─────────────────────────────────────────────────────────
 async function poll() {
   try {
@@ -965,6 +1001,16 @@ async function poll() {
     document.getElementById('stat-rate').textContent = (d.framerate || 44100).toLocaleString();
     document.getElementById('si-fmt').textContent    = `${(d.framerate||44100).toLocaleString()} Hz / ${d.channels===2?'Stereo':'Mono'}`;
     document.getElementById('track-sub').textContent = `L16 · ${(d.framerate||44100).toLocaleString()} Hz · ${d.channels===2?'Stereo':'Mono'}`;
+
+    // Sync track name and active song button from server state
+    const title  = d.song_title  || 'Puul';
+    const artist = d.song_artist || 'Lasmid';
+    const curKey = d.current_song || 'puul';
+    const tn = document.getElementById('track-name');
+    if (tn) tn.textContent = `${title} — ${artist}`;
+    document.querySelectorAll('.ss-btn').forEach(b => b.classList.remove('active'));
+    const ab = document.getElementById(`ss-${curKey}`);
+    if (ab) ab.classList.add('active');
 
     // Log
     const log = d.log || [];
