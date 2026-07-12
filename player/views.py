@@ -178,6 +178,10 @@ def docs(request):
     return render(request, 'player/docs.html')
 
 
+def walkthrough(request):
+    return render(request, 'player/walkthrough.html')
+
+
 @csrf_exempt
 def server_start(request):
     global _server_proc

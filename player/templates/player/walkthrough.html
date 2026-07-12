@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code Walkthrough — Group 6 RTSP Streaming</title>
+<style>
+/* ── Tokens ───────────────────────────────────────────────── */
+:root {
+  --bg:      #0e1219;
+  --surf:    #141c2a;
+  --surf2:   #1a2438;
+  --bdr:     #243048;
+  --acc:     #e8622a;   /* teaching orange */
+  --acc2:    #3b7dd8;   /* annotation blue */
+  --acc3:    #1cb89a;   /* teal for server */
+  --acc4:    #c792ea;   /* purple for client */
+  --txt:     #d8e8f8;
+  --txt2:    #6888aa;
+  --code-bg: #090e18;
+  --hl:      rgba(232,98,42,.08);
+  --hl-bdr:  rgba(232,98,42,.3);
+  --ann-bg:  rgba(59,125,216,.06);
+  --ann-bdr: rgba(59,125,216,.25);
+  --r: 8px;
+}
+@media (prefers-color-scheme: light) { :root {
+  --bg:#f5f7fa;--surf:#fff;--surf2:#edf2f8;--bdr:#ccd8e8;
+  --acc:#c04010;--acc2:#1a5aaa;--acc3:#0a7a62;--acc4:#6a30a0;
+  --txt:#12233a;--txt2:#4a6888;--code-bg:#e8f0f8;
+  --hl:rgba(192,64,16,.06);--hl-bdr:rgba(192,64,16,.25);
+  --ann-bg:rgba(26,90,170,.05);--ann-bdr:rgba(26,90,170,.2);
+}}
+:root[data-theme="dark"]  {--bg:#0e1219;--surf:#141c2a;--surf2:#1a2438;--bdr:#243048;--acc:#e8622a;--acc2:#3b7dd8;--acc3:#1cb89a;--acc4:#c792ea;--txt:#d8e8f8;--txt2:#6888aa;--code-bg:#090e18;--hl:rgba(232,98,42,.08);--hl-bdr:rgba(232,98,42,.3);--ann-bg:rgba(59,125,216,.06);--ann-bdr:rgba(59,125,216,.25);}
+:root[data-theme="light"] {--bg:#f5f7fa;--surf:#fff;--surf2:#edf2f8;--bdr:#ccd8e8;--acc:#c04010;--acc2:#1a5aaa;--acc3:#0a7a62;--acc4:#6a30a0;--txt:#12233a;--txt2:#4a6888;--code-bg:#e8f0f8;--hl:rgba(192,64,16,.06);--hl-bdr:rgba(192,64,16,.25);--ann-bg:rgba(26,90,170,.05);--ann-bdr:rgba(26,90,170,.2);}
+
+/* ── Reset ────────────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--txt);font-family:'Segoe UI',system-ui,sans-serif;line-height:1.7}
+a{color:var(--acc2);text-decoration:none}
+a:hover{text-decoration:underline}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+
+/* ── Progress ─────────────────────────────────────────────── */
+#prog{position:fixed;top:0;left:0;height:3px;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;z-index:999;transition:width .1s}
+
+/* ── Page layout ──────────────────────────────────────────── */
+.page{max-width:900px;margin:0 auto;padding:2rem 1.5rem 6rem}
+
+/* ── Top bar ──────────────────────────────────────────────── */
+.topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1rem 1.5rem;background:var(--surf);border-bottom:1px solid var(--bdr);
+  position:sticky;top:0;z-index:100;backdrop-filter:blur(8px);
+}
+.topbar-left{display:flex;align-items:center;gap:.8rem}
+.topbar-label{font-family:'Consolas','Cascadia Code',monospace;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--acc);font-weight:700}
+.topbar-title{font-size:.9rem;font-weight:600;color:var(--txt)}
+.topbar-right{display:flex;align-items:center;gap:.6rem}
+.tb-btn{
+  display:inline-flex;align-items:center;gap:.3rem;padding:.3rem .7rem;
+  border-radius:99px;border:1px solid var(--bdr);background:none;color:var(--txt2);
+  font-size:.72rem;cursor:pointer;font-family:inherit;transition:all .15s;
+  text-decoration:none;
+}
+.tb-btn:hover{color:var(--txt);border-color:var(--acc);text-decoration:none}
+
+/* ── Typography ───────────────────────────────────────────── */
+.eyebrow{font-family:'Consolas','Cascadia Code',monospace;font-size:.68rem;letter-spacing:.12em;text-transform:uppercase;color:var(--acc);margin-bottom:.4rem;font-weight:700}
+h1{font-size:2rem;font-weight:800;color:var(--txt);line-height:1.2;text-wrap:balance;margin-bottom:.6rem}
+h2{font-size:1.3rem;font-weight:700;color:var(--txt);margin:3rem 0 .8rem;position:relative;padding-left:1rem}
+h2::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:70%;background:var(--acc);border-radius:2px}
+h3{font-size:1rem;font-weight:700;color:var(--acc2);margin:2rem 0 .6rem;font-family:'Consolas','Cascadia Code',monospace}
+h4{font-size:.8rem;font-weight:600;color:var(--txt2);margin:1.2rem 0 .4rem;text-transform:uppercase;letter-spacing:.08em}
+p{margin-bottom:.85rem;color:var(--txt);max-width:70ch}
+ul,ol{padding-left:1.5rem;margin-bottom:.85rem}
+li{margin-bottom:.35rem;color:var(--txt)}
+strong{color:var(--txt);font-weight:600}
+hr.div{border:none;border-top:1px solid var(--bdr);margin:3rem 0}
+
+/* ── Intro hero ───────────────────────────────────────────── */
+.hero{
+  background:linear-gradient(135deg,var(--surf) 0%,var(--surf2) 100%);
+  border:1px solid var(--bdr);border-radius:var(--r);
+  padding:2rem;margin:1.5rem 0 2rem;
+}
+.hero h1{margin-bottom:.5rem}
+.hero p{font-size:1rem;color:var(--txt2);max-width:60ch;margin-bottom:0}
+
+/* ── Concept box ──────────────────────────────────────────── */
+.concept{
+  display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.5rem 0;
+}
+@media(max-width:640px){.concept{grid-template-columns:1fr}}
+.concept-card{
+  background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:1.2rem 1.4rem;
+}
+.concept-card .icon{font-size:1.6rem;margin-bottom:.5rem}
+.concept-card h4{color:var(--acc);text-transform:none;font-size:.95rem;letter-spacing:0;margin:0 0 .4rem;font-weight:700}
+.concept-card p{font-size:.88rem;color:var(--txt2);margin:0}
+
+/* ── Architecture diagram ─────────────────────────────────── */
+.arch{
+  background:var(--code-bg);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:1.4rem 1.6rem;font-family:'Cascadia Code','Consolas',monospace;
+  font-size:.78rem;line-height:1.9;overflow-x:auto;margin:1rem 0;
+}
+.aa{color:var(--acc)} .ab{color:var(--acc2)} .ac{color:var(--acc3)} .ap{color:var(--acc4)} .ad{color:var(--txt2)}
+
+/* ── Step counter ─────────────────────────────────────────── */
+.steps{counter-reset:step;display:flex;flex-direction:column;gap:.5rem;margin:1rem 0 1.5rem}
+.step{
+  display:flex;gap:1rem;align-items:flex-start;
+  background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);
+  padding:.9rem 1.1rem;
+}
+.step::before{
+  counter-increment:step;content:counter(step);
+  flex-shrink:0;width:28px;height:28px;border-radius:50%;
+  background:var(--acc);color:#fff;font-weight:700;font-size:.8rem;
+  display:flex;align-items:center;justify-content:center;margin-top:.05rem;
+}
+.step-body{flex:1}
+.step-title{font-weight:700;color:var(--txt);margin-bottom:.2rem;font-size:.92rem}
+.step-desc{font-size:.86rem;color:var(--txt2);margin:0}
+
+/* ── File header ──────────────────────────────────────────── */
+.file-header{
+  display:flex;align-items:center;gap:.7rem;
+  background:var(--surf2);border:1px solid var(--bdr);
+  border-radius:var(--r) var(--r) 0 0;padding:.8rem 1.2rem;
+  border-bottom:2px solid var(--acc);margin-top:2rem;
+}
+.file-dot{width:10px;height:10px;border-radius:50%;background:var(--acc)}
+.file-name{font-family:'Cascadia Code','Consolas',monospace;font-size:.85rem;color:var(--txt);font-weight:600}
+.file-desc{font-size:.78rem;color:var(--txt2)}
+
+/* ── Annotated code block ─────────────────────────────────── */
+.ann-block{
+  border:1px solid var(--bdr);border-top:none;overflow:hidden;
+  margin-bottom:.4rem;
+}
+.ann-block:last-of-type,.ann-block.last{border-radius:0 0 var(--r) var(--r)}
+.ann-block.section-start{border-top:2px dashed var(--bdr)!important}
+.ann-row{
+  display:grid;grid-template-columns:1fr 1fr;
+}
+@media(max-width:640px){.ann-row{grid-template-columns:1fr}}
+.ann-code{
+  background:var(--code-bg);padding:.85rem 1rem;
+  font-family:'Cascadia Code','Fira Code','Consolas',monospace;
+  font-size:.78rem;line-height:1.7;border-right:2px solid var(--hl-bdr);
+  overflow-x:auto;
+}
+.ann-explain{
+  background:var(--ann-bg);padding:.85rem 1rem;
+  font-size:.85rem;line-height:1.6;color:var(--txt2);
+  border-left:none;
+  display:flex;flex-direction:column;justify-content:center;
+}
+.ann-explain strong{color:var(--txt)}
+.ann-explain code{
+  font-family:'Cascadia Code','Consolas',monospace;
+  font-size:.82em;background:var(--surf2);
+  padding:.05em .3em;border-radius:3px;color:var(--acc2);
+}
+.ann-label{
+  display:inline-block;font-family:'Consolas',monospace;
+  font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;
+  color:var(--acc);border:1px solid var(--acc);border-radius:3px;
+  padding:.1rem .35rem;margin-bottom:.35rem;
+}
+
+/* Section divider inside annotation blocks */
+.ann-section{
+  background:var(--surf2);border-top:1px solid var(--bdr);border-bottom:1px solid var(--bdr);
+  padding:.45rem 1rem;
+  font-family:'Consolas','Cascadia Code',monospace;
+  font-size:.67rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--txt2);
+}
+
+/* Syntax colours */
+.kw{color:#c792ea} .fn{color:#82aaff} .cls{color:#ffcb6b}
+.str{color:#c3e88d} .num{color:#f78c6c} .cmt{color:#4a6878;font-style:italic} .dec{color:#89ddff}
+/* light mode overrides */
+:root[data-theme="light"] .kw{color:#6a2590}
+:root[data-theme="light"] .fn{color:#1a55a0}
+:root[data-theme="light"] .str{color:#1a6020}
+:root[data-theme="light"] .num{color:#a04020}
+:root[data-theme="light"] .cmt{color:#7a8a9a}
+:root[data-theme="light"] .dec{color:#0a5a7a}
+:root[data-theme="light"] .cls{color:#7a5000}
+@media(prefers-color-scheme:light){
+  .kw{color:#6a2590}.fn{color:#1a55a0}.str{color:#1a6020}
+  .num{color:#a04020}.cmt{color:#7a8a9a}.dec{color:#0a5a7a}.cls{color:#7a5000}
+}
+
+/* ── Runtime sequence ─────────────────────────────────────── */
+.seq{
+  display:grid;grid-template-columns:1fr 40px 1fr;
+  gap:0;margin:1.5rem 0;
+}
+.seq-col-hd{
+  text-align:center;padding:.5rem;font-family:'Consolas',monospace;
+  font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;font-weight:700;
+  border-radius:var(--r) var(--r) 0 0;margin-bottom:1px;
+}
+.seq-col-hd.srv{background:rgba(28,184,154,.15);color:var(--acc3);border:1px solid rgba(28,184,154,.3)}
+.seq-col-hd.cli{background:rgba(199,146,234,.15);color:var(--acc4);border:1px solid rgba(199,146,234,.3)}
+.seq-mid-hd{display:flex;align-items:center;justify-content:center;font-size:.7rem;color:var(--txt2)}
+.seq-row{display:contents}
+.seq-cell{
+  padding:.6rem .8rem;font-size:.82rem;border-bottom:1px solid var(--bdr);
+}
+.seq-cell.srv{background:rgba(28,184,154,.05);border-left:2px solid rgba(28,184,154,.3);color:var(--txt)}
+.seq-cell.cli{background:rgba(199,146,234,.05);border-right:2px solid rgba(199,146,234,.3);color:var(--txt)}
+.seq-cell.empty{background:transparent;border:none}
+.seq-arrow{
+  display:flex;align-items:center;justify-content:center;
+  font-size:1rem;color:var(--acc2);border-bottom:1px solid var(--bdr);
+}
+.seq-arrow.right{color:var(--acc3)}
+.seq-arrow.left{color:var(--acc4)}
+.seq-arrow.both{color:var(--acc2)}
+.seq-msg{font-size:.7rem;color:var(--txt2);display:block;margin-top:.1rem;font-family:'Consolas',monospace}
+
+/* ── Callout ──────────────────────────────────────────────── */
+.callout{
+  background:var(--surf2);border-left:3px solid var(--acc);
+  border-radius:0 var(--r) var(--r) 0;padding:.8rem 1.1rem;margin:1rem 0;
+  font-size:.88rem;color:var(--txt2);
+}
+.callout.blue{border-left-color:var(--acc2)}
+.callout.green{border-left-color:var(--acc3)}
+.callout strong{color:var(--acc)}
+.callout.blue strong{color:var(--acc2)}
+.callout.green strong{color:var(--acc3)}
+
+/* ── Talking points ───────────────────────────────────────── */
+.tp-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.2rem 0}
+@media(max-width:640px){.tp-grid{grid-template-columns:1fr}}
+.tp-card{background:var(--surf);border:1px solid var(--bdr);border-radius:var(--r);padding:1.1rem 1.3rem}
+.tp-num{font-family:'Consolas',monospace;font-size:.68rem;font-weight:700;color:var(--acc);letter-spacing:.05em;text-transform:uppercase;margin-bottom:.35rem}
+.tp-title{font-weight:700;font-size:.92rem;color:var(--txt);margin-bottom:.3rem}
+.tp-text{font-size:.84rem;color:var(--txt2);line-height:1.5}
+.tp-text code{font-family:'Consolas',monospace;font-size:.82em;background:var(--surf2);padding:.05em .3em;border-radius:3px;color:var(--acc2)}
+
+/* ── Phase comparison ─────────────────────────────────────── */
+.phase-compare{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin:1.2rem 0}
+@media(max-width:640px){.phase-compare{grid-template-columns:1fr}}
+.phase-box{border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden}
+.phase-hd{padding:.6rem 1rem;font-family:'Consolas',monospace;font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase}
+.phase-hd.p1{background:rgba(232,98,42,.1);color:var(--acc);border-bottom:1px solid rgba(232,98,42,.2)}
+.phase-hd.p2{background:rgba(28,184,154,.1);color:var(--acc3);border-bottom:1px solid rgba(28,184,154,.2)}
+.phase-body{padding:.8rem 1rem}
+.phase-body ul{margin:0;padding-left:1.2rem}
+.phase-body li{font-size:.85rem;color:var(--txt2);margin-bottom:.3rem}
+.phase-body li strong{color:var(--txt)}
+
+/* ── Inline code ──────────────────────────────────────────── */
+code{font-family:'Cascadia Code','Consolas',monospace;font-size:.84em;background:var(--surf2);padding:.1em .32em;border-radius:3px;color:var(--acc2)}
+</style>
+</head>
+<body>
+
+<div id="prog"></div>
+
+<!-- ══ TOP BAR ══ -->
+<div class="topbar">
+  <div class="topbar-left">
+    <span class="topbar-label">Group 6</span>
+    <span class="topbar-title">Code Walkthrough &amp; Presentation Guide</span>
+  </div>
+  <div class="topbar-right">
+    <button class="tb-btn" onclick="toggleTheme()">
+      <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 12.5A5.5 5.5 0 0 1 8 2.5v11z"/></svg>
+      Theme
+    </button>
+    <a href="/docs" class="tb-btn">Docs</a>
+    <a href="/" class="tb-btn">Dashboard</a>
+  </div>
+</div>
+
+<div class="page">
+
+<!-- ══ HERO ══ -->
+<div class="hero">
+  <div class="eyebrow">DCIT 313 · Distributed Systems · Group 6</div>
+  <h1>From Zero to Audio Streaming</h1>
+  <p>A complete line-by-line walkthrough of how the project works — from the simplest raw socket proof of concept through to the full RTSP/RTP protocol stack. Use this page to understand, rehearse, and explain the code to your class.</p>
+</div>
+
+
+<style>
+/* ── Topic verify ──────────────────────────────────────── */
+.tv-banner{
+  display:flex;align-items:center;gap:.9rem;
+  background:linear-gradient(135deg,rgba(28,184,154,.12),rgba(28,184,154,.04));
+  border:1.5px solid rgba(28,184,154,.45);border-radius:var(--r);
+  padding:1rem 1.4rem;margin:1.4rem 0 1rem;
+}
+.tv-icon{
+  width:38px;height:38px;border-radius:50%;
+  background:rgba(28,184,154,.15);border:2px solid rgba(28,184,154,.5);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  font-size:1.1rem;color:var(--acc3);font-weight:900;
+}
+.tv-text strong{display:block;font-size:1rem;color:var(--acc3);margin-bottom:.2rem}
+.tv-text span{font-size:.87rem;color:var(--txt2)}
+
+.req-grid{
+  display:grid;grid-template-columns:1fr 1fr auto;
+  border:1px solid var(--bdr);border-radius:var(--r);overflow:hidden;
+  margin:1rem 0;font-size:.85rem;
+}
+@media(max-width:640px){.req-grid{grid-template-columns:1fr}}
+.rg-hd{
+  background:var(--surf2);padding:.5rem .9rem;
+  font-family:'Consolas',monospace;font-size:.68rem;
+  font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--txt2);
+  border-bottom:1px solid var(--bdr);
+}
+.rg-cell{
+  padding:.7rem .9rem;border-bottom:1px solid var(--bdr);
+  color:var(--txt);line-height:1.5;
+}
+.rg-cell.topic{color:var(--txt2);font-style:italic}
+.rg-cell.built{color:var(--txt)}
+.rg-cell.status{
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:.9rem;color:var(--acc3);
+}
+@media(max-width:640px){.rg-hd:nth-child(3),.rg-cell.status{display:none}}
+.rg-cell code{font-size:.8em}
+
+/* ── Q&A cards ─────────────────────────────────────────── */
+.qa-block{margin:1.4rem 0}
+.qa-card{
+  background:var(--surf);border:1px solid var(--bdr);
+  border-radius:var(--r);overflow:hidden;margin-bottom:1rem;
+}
+.qa-q{
+  display:flex;align-items:flex-start;gap:.8rem;
+  padding:.9rem 1.2rem;background:var(--surf2);border-bottom:1px solid var(--bdr);
+}
+.qa-q-label{
+  flex-shrink:0;background:var(--acc);color:#fff;
+  font-family:'Consolas',monospace;font-size:.7rem;font-weight:700;
+  padding:.15rem .45rem;border-radius:4px;margin-top:.15rem;
+}
+.qa-q-text{font-weight:700;font-size:.97rem;color:var(--txt)}
+.qa-a{padding:1rem 1.2rem}
+.qa-a p{font-size:.9rem;color:var(--txt2);margin-bottom:.7rem;max-width:none}
+.qa-a p:last-child{margin-bottom:0}
+.qa-a strong{color:var(--acc)}
+
+.why-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:.5rem;
+  margin:.6rem 0;
+}
+@media(max-width:580px){.why-grid{grid-template-columns:1fr}}
+.why-item{
+  background:var(--surf2);border:1px solid var(--bdr);border-radius:6px;
+  padding:.6rem .85rem;font-size:.83rem;
+}
+.why-item .wi-num{
+  font-family:'Consolas',monospace;font-size:.65rem;
+  color:var(--acc);font-weight:700;margin-bottom:.2rem;
+}
+.why-item .wi-text{color:var(--txt2);line-height:1.5}
+.why-item .wi-text strong{color:var(--txt)}
+
+.lang-badge{
+  display:inline-flex;align-items:center;gap:.4rem;
+  background:rgba(59,125,216,.12);border:1px solid rgba(59,125,216,.35);
+  border-radius:99px;padding:.25rem .75rem;
+  font-family:'Consolas',monospace;font-size:.8rem;font-weight:700;
+  color:var(--acc2);margin-bottom:.8rem;
+}
+.ide-badge{
+  display:inline-flex;align-items:center;gap:.4rem;
+  background:rgba(232,98,42,.1);border:1px solid rgba(232,98,42,.3);
+  border-radius:99px;padding:.25rem .75rem;
+  font-family:'Consolas',monospace;font-size:.8rem;font-weight:700;
+  color:var(--acc);margin-bottom:.8rem;
+}
+</style>
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 0: TOPIC VERIFICATION
+══════════════════════════════════════════════════════════ -->
+<h2>Does Our Project Match the Topic?</h2>
+
+<p>The assigned topic is: <em>"Develop an audio streaming server and client that communicate using the Real Time Streaming Protocol (RTSP)."</em> Here is a breakdown of every requirement and exactly where we satisfy it.</p>
+
+<div class="tv-banner">
+  <div class="tv-icon">✓</div>
+  <div class="tv-text">
+    <strong>Yes — our project fully satisfies every element of the topic.</strong>
+    <span>We implemented RTSP/1.0 from scratch in Python, plus RTP audio transport, an SDP session description, and a live web dashboard. Every word of the topic is covered.</span>
+  </div>
+</div>
+
+<div class="req-grid">
+  <div class="rg-hd">Topic Says</div>
+  <div class="rg-hd">What We Built</div>
+  <div class="rg-hd">Status</div>
+
+  <div class="rg-cell topic">"…audio streaming <strong>server</strong>…"</div>
+  <div class="rg-cell built"><code>rtsp_server.py</code> — a TCP server on port 8554 that handles RTSP commands and streams audio via RTP/UDP. Runs as a subprocess managed by Django.</div>
+  <div class="rg-cell status">✓</div>
+
+  <div class="rg-cell topic">"…and <strong>client</strong>…"</div>
+  <div class="rg-cell built"><code>player/views.py</code> acts as the RTSP client — it opens a TCP socket to the server and sends DESCRIBE → SETUP → PLAY → PAUSE → TEARDOWN. The Django dashboard is the user-facing client UI.</div>
+  <div class="rg-cell status">✓</div>
+
+  <div class="rg-cell topic">"…that <strong>communicate</strong>…"</div>
+  <div class="rg-cell built">Client and server exchange properly formatted RTSP/1.0 messages over TCP — each with a method line, CSeq header, and <code>\r\n\r\n</code> terminator exactly as RFC 2326 specifies.</div>
+  <div class="rg-cell status">✓</div>
+
+  <div class="rg-cell topic">"…using the <strong>Real Time Streaming Protocol (RTSP)</strong>"</div>
+  <div class="rg-cell built">Full RTSP/1.0 state machine: INIT → READY → PLAYING → PAUSED → TEARDOWN. Five commands implemented. SDP session description in DESCRIBE response. Session ID assigned on SETUP. RTP/UDP for the audio data channel.</div>
+  <div class="rg-cell status">✓</div>
+
+  <div class="rg-cell topic">Bonus: audio actually plays</div>
+  <div class="rg-cell built">The server streams <em>Puul</em> by Lasmid (decoded from MP3 using <code>miniaudio</code>) as 16-bit mono PCM at 44 100 Hz wrapped in RTP packets. The browser dashboard shows live packet counts and bytes received.</div>
+  <div class="rg-cell status">✓</div>
+
+  <div class="rg-cell topic">Bonus: distributed systems context</div>
+  <div class="rg-cell built">Phase 1 demonstrates raw socket streaming (the foundation). Phase 2 shows how a real protocol solves the limitations — directly connecting to the course's distributed middleware theme and the CORBA comparison.</div>
+  <div class="rg-cell status">✓</div>
+</div>
+
+<div class="callout green" style="margin-top:.5rem">
+  <strong>Key point for the presentation:</strong> The topic asks for RTSP. We did not just read about RTSP — we hand-coded every byte of the protocol: the TCP framing, the header parsing, the SDP body, the session state machine, and the RTP packet structure. That is the full implementation, not a library wrapper.
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 1: THE CORE IDEA
+══════════════════════════════════════════════════════════ -->
+<h2>The Core Idea — What Are We Building?</h2>
+
+<p>Audio streaming means sending sound over a network so someone far away can hear it. The challenge is that audio is <strong>continuous</strong> — you can't wait until the whole file arrives before playing it. You need to hear each piece as it comes in, in real time.</p>
+
+<div class="concept">
+  <div class="concept-card">
+    <div class="icon">📁</div>
+    <h4>The Problem</h4>
+    <p>A WAV audio file is just a long sequence of numbers — each number is the air pressure measured 44,100 times per second. We need to send those numbers across a network as fast as they were recorded, so the listener hears them smoothly.</p>
+  </div>
+  <div class="concept-card">
+    <div class="icon">🔌</div>
+    <h4>Our Solution</h4>
+    <p>Use TCP sockets — the same technology your browser uses to load web pages — to connect two Python programs. The <strong>server</strong> reads the audio file and sends chunks. The <strong>client</strong> receives chunks and plays them.</p>
+  </div>
+  <div class="concept-card">
+    <div class="icon">📡</div>
+    <h4>What Is a Socket?</h4>
+    <p>A socket is a two-way pipe between two computers. Once connected, either side can write bytes in and the other side reads them out. It's like a phone call for data.</p>
+  </div>
+  <div class="concept-card">
+    <div class="icon">🎵</div>
+    <h4>What Is PCM Audio?</h4>
+    <p>PCM (Pulse Code Modulation) is the simplest audio format — just raw numbers in a sequence. A WAV file is a PCM file with a small header at the top describing the format. No compression, no encoding.</p>
+  </div>
+</div>
+
+<div class="callout blue">
+  <strong>The key insight:</strong> All audio streaming — Spotify, YouTube, WhatsApp voice calls, your radio — works on the same principle. A sender sends audio bytes across a network and the receiver plays them. We built our own version from scratch.
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 2: CORE ARCHITECTURE
+══════════════════════════════════════════════════════════ -->
+<h2>Core Architecture</h2>
+
+<p>The project has two phases. Phase 1 is deliberately simple — prove the concept works with the minimum possible code. Phase 2 adds the professional RTSP/RTP protocol on top.</p>
+
+<div class="arch">
+<span class="aa">╔══════════════════════════════════════════════════════════════════╗</span>
+<span class="aa">║               PHASE 1 — Raw Socket Streaming                     ║</span>
+<span class="aa">╠═══════════════════════════════╦══════════════════════════════════╣</span>
+<span class="aa">║</span>   <span class="ac">SERVER (phase1_server.py)</span>    <span class="aa">║</span>   <span class="ap">CLIENT (phase1_client.py)</span>    <span class="aa">║</span>
+<span class="aa">║</span>                               <span class="aa">║</span>                              <span class="aa">║</span>
+<span class="aa">║</span>  1. Open TCP socket           <span class="aa">║</span>  1. Connect to server        <span class="aa">║</span>
+<span class="aa">║</span>  2. Wait for client           <span class="aa">║</span>  2. Read metadata line       <span class="aa">║</span>
+<span class="aa">║</span>  3. Send metadata header      <span class="aa">╠══ "1,2,44100,220500\n" ═════▶</span> <span class="aa">║</span>
+<span class="aa">║</span>  4. Read WAV in 4KB chunks    <span class="aa">║</span>  3. Set up audio player      <span class="aa">║</span>
+<span class="aa">║</span>  5. Send each chunk           <span class="aa">╠══ [4096 bytes PCM] ═════════▶</span> <span class="aa">║</span>
+<span class="aa">║</span>  6. Sleep to pace stream      <span class="aa">╠══ [4096 bytes PCM] ═════════▶</span> <span class="aa">║</span>
+<span class="aa">║</span>  7. Repeat until EOF          <span class="aa">╠══ [4096 bytes PCM] ═════════▶</span> <span class="aa">║</span>
+<span class="aa">║</span>                               <span class="aa">║</span>  4. Play each chunk live     <span class="aa">║</span>
+<span class="aa">║</span>  PORT: 5004 (TCP)             <span class="aa">║</span>  5. Save to received.wav     <span class="aa">║</span>
+<span class="aa">╚═══════════════════════════════╩══════════════════════════════════╝</span>
+
+<span class="ad">Phase 2 adds the RTSP control channel (TCP:8554) + RTP data channel (UDP:6970)</span>
+<span class="ad">— a separate socket for commands and a separate socket for audio data.</span></div>
+
+<h3>How the Two Phases Compare</h3>
+<div class="phase-compare">
+  <div class="phase-box">
+    <div class="phase-hd p1">Phase 1 · Raw Sockets</div>
+    <div class="phase-body">
+      <ul>
+        <li><strong>1 TCP connection</strong> carries everything</li>
+        <li>Custom text metadata header</li>
+        <li>Raw PCM bytes sent directly</li>
+        <li>No pause, no seek, no session</li>
+        <li>Simple — ~80 lines each file</li>
+        <li>Port 5004</li>
+      </ul>
+    </div>
+  </div>
+  <div class="phase-box">
+    <div class="phase-hd p2">Phase 2 · RTSP/RTP</div>
+    <div class="phase-body">
+      <ul>
+        <li><strong>TCP</strong> for control commands (DESCRIBE / SETUP / PLAY / PAUSE / TEARDOWN)</li>
+        <li><strong>UDP</strong> for audio data — lower latency</li>
+        <li>SDP session description (RFC 4566)</li>
+        <li>RTP framing adds sequence numbers &amp; timestamps</li>
+        <li>Industry standard — VLC, QuickTime use same protocol</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 3: PHASE 1 SERVER — LINE BY LINE
+══════════════════════════════════════════════════════════ -->
+<h2>Phase 1 Server — <code>phase1_server.py</code></h2>
+<p>This file does three things: generates a test audio file if none exists, waits for a client to connect, then streams the audio one chunk at a time.</p>
+
+<!-- FILE HEADER -->
+<div class="file-header">
+  <div class="file-dot"></div>
+  <span class="file-name">phase1_server.py</span>
+  <span class="file-desc">— Raw TCP audio server · 111 lines</span>
+</div>
+
+<!-- IMPORTS -->
+<div class="ann-block">
+  <div class="ann-section">📦 Imports — loading the tools we need</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">import</span> socket
+<span class="kw">import</span> wave
+<span class="kw">import</span> time
+<span class="kw">import</span> sys
+<span class="kw">import</span> os</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 11–15</div>
+      <strong>Every import gives us a new set of tools:</strong><br>
+      <code>socket</code> — creates network connections (TCP pipes)<br>
+      <code>wave</code> — reads/writes WAV audio files<br>
+      <code>time</code> — lets us pause the program with <code>time.sleep()</code><br>
+      <code>sys</code> — accesses command-line arguments<br>
+      <code>os</code> — checks whether a file exists on disk<br><br>
+      All of these come with Python — nothing to install.
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG -->
+<div class="ann-block">
+  <div class="ann-section">⚙️ Configuration — the settings at the top of the file</div>
+  <div class="ann-row">
+    <div class="ann-code">HOST = <span class="str">'0.0.0.0'</span>
+PORT = <span class="num">5004</span>
+CHUNK_SIZE = <span class="num">4096</span>
+AUDIO_FILE = <span class="str">'sample.wav'</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 18–21</div>
+      <strong>Constants are defined at the top so they're easy to change:</strong><br>
+      <code>'0.0.0.0'</code> means "listen on every network interface" — so any computer can connect, not just localhost.<br>
+      <code>5004</code> is the port number — like a door number on a building. The client must knock on the same door.<br>
+      <code>4096</code> bytes = 4 KB per chunk. At 44 100 Hz, 16-bit mono, this is about 23 milliseconds of audio per packet.<br>
+      <code>'sample.wav'</code> is the audio file to stream.
+    </div>
+  </div>
+</div>
+
+<!-- GENERATE WAV - FUNCTION START -->
+<div class="ann-block section-start">
+  <div class="ann-section">🎵 generate_sample_wav() — creates a test tone if no audio file exists</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">generate_sample_wav</span>(filename):
+    <span class="kw">import</span> struct
+    <span class="kw">import</span> math</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 25–31</div>
+      <strong>Function definition and two more imports.</strong><br>
+      <code>struct</code> converts Python numbers into raw bytes (e.g., an integer into 2 bytes). We need this to write audio samples into the WAV file.<br>
+      <code>math</code> gives us <code>math.sin()</code> to generate a smooth sine wave tone. These imports are inside the function because they're only needed here.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">sample_rate = <span class="num">44100</span>
+duration    = <span class="num">5</span>
+frequency   = <span class="num">440.0</span>
+num_samples = sample_rate * duration
+amplitude   = <span class="num">32767</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 33–37</div>
+      <strong>The maths behind audio:</strong><br>
+      <code>44 100</code> samples per second is the CD standard — how many times per second we measure the air pressure.<br>
+      <code>440 Hz</code> is the musical note A4. The sine wave completes 440 full cycles per second.<br>
+      <code>num_samples = 44100 × 5 = 220 500</code> — we need 220,500 numbers to represent 5 seconds of audio.<br>
+      <code>32767</code> is the maximum value for a 16-bit signed integer — the loudest the audio can get without distortion.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">with</span> wave.open(filename, <span class="str">'w'</span>) <span class="kw">as</span> wf:
+    wf.setnchannels(<span class="num">1</span>)
+    wf.setsampwidth(<span class="num">2</span>)
+    wf.setframerate(sample_rate)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 39–42</div>
+      <strong>Create and configure the WAV file:</strong><br>
+      <code>wave.open(filename, 'w')</code> creates a new WAV file. The <code>'w'</code> means "write mode."<br>
+      <code>setnchannels(1)</code> → mono audio (one channel). Stereo would be 2.<br>
+      <code>setsampwidth(2)</code> → 2 bytes per sample = 16-bit audio. 16 bits gives 65,536 possible loudness levels.<br>
+      <code>setframerate(44100)</code> → 44,100 samples per second tells any player how fast to play back the samples.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">frames = []
+<span class="kw">for</span> i <span class="kw">in</span> <span class="fn">range</span>(num_samples):
+    sample = <span class="fn">int</span>(amplitude *
+              math.sin(<span class="num">2</span> * math.pi *
+                       frequency * i /
+                       sample_rate))
+    frames.append(
+        struct.pack(<span class="str">'&lt;h'</span>, sample))</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 44–47</div>
+      <strong>Generate 220,500 audio samples mathematically:</strong><br>
+      For each sample number <code>i</code> from 0 to 220,499:<br>
+      — <code>math.sin(2π × 440 × i / 44100)</code> produces a value between −1.0 and +1.0, cycling 440 times per second.<br>
+      — Multiply by <code>32767</code> to scale it to 16-bit range.<br>
+      — <code>struct.pack('&lt;h', sample)</code> converts the Python integer into 2 raw bytes in little-endian format — exactly what a WAV file expects.<br>
+      The <code>&lt;</code> means little-endian (least significant byte first), <code>h</code> means signed short (16-bit integer).
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">    wf.writeframes(<span class="fn">b</span><span class="str">''</span>.join(frames))
+
+<span class="fn">print</span>(<span class="fn">f</span><span class="str">"[SERVER] Generated: {filename}"</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 49–51</div>
+      <code>b''.join(frames)</code> glues all 220,500 two-byte chunks into one long byte string — <code>b</code> means bytes not text.<br>
+      <code>wf.writeframes()</code> writes all those bytes into the WAV file in one go.<br>
+      The file is automatically closed when the <code>with</code> block ends.<br>
+      The <code>print()</code> logs a message to the terminal so we know it worked.
+    </div>
+  </div>
+</div>
+
+<!-- STREAM_AUDIO -->
+<div class="ann-block section-start">
+  <div class="ann-section">📤 stream_audio() — the heart of the server: reads WAV and sends it to the client</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">stream_audio</span>(conn, addr):
+    <span class="fn">print</span>(<span class="fn">f</span><span class="str">"[SERVER] Client: {addr}"</span>)
+
+    <span class="kw">if not</span> os.path.exists(AUDIO_FILE):
+        generate_sample_wav(AUDIO_FILE)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 54–60</div>
+      <strong>Called once for each client that connects.</strong><br>
+      <code>conn</code> is the socket object — a two-way pipe to the client.<br>
+      <code>addr</code> is a tuple like <code>('192.168.1.5', 43201)</code> — the client's IP and port.<br>
+      <code>os.path.exists()</code> checks if the WAV file is on disk. If not, we generate a test tone first so the server always has something to stream.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">with</span> wave.open(AUDIO_FILE, <span class="str">'rb'</span>) <span class="kw">as</span> wf:
+    channels  = wf.getnchannels()
+    sampwidth = wf.getsampwidth()
+    framerate = wf.getframerate()
+    n_frames  = wf.getnframes()</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 62–66</div>
+      <strong>Open the audio file and read its technical details.</strong><br>
+      <code>'rb'</code> = read binary — we're reading raw bytes, not text.<br>
+      The <code>wave</code> module reads the WAV header and extracts:<br>
+      <code>channels</code> → 1 (mono) or 2 (stereo)<br>
+      <code>sampwidth</code> → bytes per sample (2 for 16-bit)<br>
+      <code>framerate</code> → 44100 samples/second<br>
+      <code>n_frames</code> → total number of audio frames<br>
+      We need these numbers to tell the client how to decode what follows.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">metadata = (
+    <span class="fn">f</span><span class="str">"{channels},{sampwidth},"</span>
+    <span class="fn">f</span><span class="str">"{framerate},{n_frames}\n"</span>
+)
+conn.sendall(metadata.encode())</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 71–72</div>
+      <strong>The "handshake" — tell the client how to decode the audio before sending it.</strong><br>
+      Example: <code>"1,2,44100,220500\n"</code> — one line of comma-separated values followed by a newline character (<code>\n</code>).<br>
+      The client reads this first line and uses those four numbers to set up its audio player.<br>
+      <code>.encode()</code> converts the Python string into bytes, because sockets only send bytes.<br>
+      <code>sendall()</code> guarantees every byte is sent — unlike <code>send()</code> which might only send part of it.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">chunk_num = <span class="num">0</span>
+<span class="kw">while</span> <span class="kw">True</span>:
+    data = wf.readframes(CHUNK_SIZE)
+    <span class="kw">if not</span> data:
+        <span class="kw">break</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 75–79</div>
+      <strong>The main streaming loop — runs until the audio file ends.</strong><br>
+      <code>while True:</code> loops forever — the <code>break</code> statements inside are the only way out.<br>
+      <code>wf.readframes(4096)</code> reads the next 4096 audio frames from the WAV file. Each frame is <code>sampwidth × channels</code> bytes — for mono 16-bit audio, each frame is 2 bytes, so we read 8,192 bytes at a time.<br>
+      <code>if not data: break</code> — when we reach the end of the file, <code>readframes()</code> returns an empty byte string (<code>b''</code>), which is falsy in Python.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">    <span class="kw">try</span>:
+        conn.sendall(data)
+        chunk_num += <span class="num">1</span>
+
+        time.sleep(CHUNK_SIZE /
+            (framerate * channels
+             * sampwidth))</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 81–86</div>
+      <strong>Send one chunk and pace the stream:</strong><br>
+      <code>conn.sendall(data)</code> sends the raw audio bytes to the client over TCP.<br>
+      The <code>time.sleep()</code> is the key insight — without it, we'd send the whole file in milliseconds and the client's audio buffer would overflow. The formula <code>4096 ÷ (44100 × 1 × 2) ≈ 0.0464 seconds</code> makes us send audio at exactly the rate it should be played back.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">    <span class="kw">except</span> (BrokenPipeError,
+             ConnectionResetError):
+        <span class="fn">print</span>(<span class="str">"[SERVER] Client disconnected"</span>)
+        <span class="kw">break</span>
+
+<span class="fn">print</span>(<span class="fn">f</span><span class="str">"Sent {chunk_num} chunks."</span>)
+conn.close()</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 88–93</div>
+      <strong>Handle client disconnection gracefully:</strong><br>
+      If the client closes their window mid-stream, the next <code>sendall()</code> will raise a <code>BrokenPipeError</code> (Linux/Mac) or <code>ConnectionResetError</code> (Windows).<br>
+      We catch these and <code>break</code> out of the loop cleanly instead of crashing.<br>
+      <code>conn.close()</code> releases the network resources after streaming ends.
+    </div>
+  </div>
+</div>
+
+<!-- RUN_SERVER -->
+<div class="ann-block section-start">
+  <div class="ann-section">🚀 run_server() — creates the TCP socket and waits for clients</div>
+  <div class="ann-row">
+    <div class="ann-code">server_sock = socket.socket(
+    socket.AF_INET,
+    socket.SOCK_STREAM
+)
+server_sock.setsockopt(
+    socket.SOL_SOCKET,
+    socket.SO_REUSEADDR, <span class="num">1</span>
+)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 97–98</div>
+      <strong>Create and configure the server socket:</strong><br>
+      <code>socket.AF_INET</code> → use IPv4 addresses (e.g., 192.168.1.5).<br>
+      <code>socket.SOCK_STREAM</code> → use TCP (reliable, ordered, connection-based). The alternative would be UDP (<code>SOCK_DGRAM</code>).<br>
+      <code>SO_REUSEADDR = 1</code> is critical — without it, if you restart the server within 60 seconds, you get "Address already in use". This option bypasses that wait.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">server_sock.bind((HOST, PORT))
+server_sock.listen(<span class="num">1</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 99–100</div>
+      <code>bind((HOST, PORT))</code> claims port 5004. The socket now "owns" that port — like putting your name on a door. No other program can use port 5004 while this runs.<br>
+      <code>listen(1)</code> puts the socket into "waiting" mode and creates a queue for incoming connection requests. The <code>1</code> means only 1 connection waiting in the queue at a time.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">while</span> <span class="kw">True</span>:
+    conn, addr = server_sock.accept()
+    stream_audio(conn, addr)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 105–107</div>
+      <strong>The accept loop — waits for clients forever:</strong><br>
+      <code>server_sock.accept()</code> <em>blocks</em> — the program pauses here and does nothing until a client connects. When one does, it returns a new socket <code>conn</code> (the private pipe to that client) and their address <code>addr</code>.<br>
+      We then call <code>stream_audio()</code> to serve them. Note: this handles one client at a time. Phase 2 uses threads to handle multiple clients simultaneously.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block last">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">if</span> __name__ == <span class="str">'__main__'</span>:
+    run_server()</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 110–111</div>
+      <strong>The entry point guard — Python's standard way to run a file:</strong><br>
+      <code>__name__</code> is a special Python variable. When you run <code>python phase1_server.py</code> directly, Python sets <code>__name__</code> to <code>'__main__'</code>.<br>
+      But if another file does <code>import phase1_server</code>, <code>__name__</code> would be <code>'phase1_server'</code> — so <code>run_server()</code> would NOT auto-execute.<br>
+      This pattern is the Python convention for "only run this if the file is executed directly."
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 4: PHASE 1 CLIENT — LINE BY LINE
+══════════════════════════════════════════════════════════ -->
+<h2>Phase 1 Client — <code>phase1_client.py</code></h2>
+<p>The client has four jobs: connect to the server, read the metadata header, receive audio chunks in a loop, and play or save them.</p>
+
+<div class="file-header" style="border-bottom-color:var(--acc4)">
+  <div class="file-dot" style="background:var(--acc4)"></div>
+  <span class="file-name">phase1_client.py</span>
+  <span class="file-desc">— Raw TCP audio client · 115 lines</span>
+</div>
+
+<!-- IMPORTS -->
+<div class="ann-block">
+  <div class="ann-section">📦 Imports</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">import</span> socket
+<span class="kw">import</span> wave
+<span class="kw">import</span> sys
+<span class="kw">import</span> io</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 15–18</div>
+      <code>socket</code> — to connect to the server.<br>
+      <code>wave</code> — to write the received audio into a WAV file for verification.<br>
+      <code>sys</code> — to read the optional server IP from the command line (<code>sys.argv</code>).<br>
+      <code>io</code> — imported but not actively used (leftover from an earlier version). A common occurrence in real projects.
+    </div>
+  </div>
+</div>
+
+<!-- CONFIG -->
+<div class="ann-block">
+  <div class="ann-section">⚙️ Configuration</div>
+  <div class="ann-row">
+    <div class="ann-code">SERVER_IP = sys.argv[<span class="num">1</span>] \
+    <span class="kw">if</span> <span class="fn">len</span>(sys.argv) > <span class="num">1</span> \
+    <span class="kw">else</span> <span class="str">'127.0.0.1'</span>
+SERVER_PORT = <span class="num">5004</span>
+CHUNK_SIZE  = <span class="num">4096</span>
+SAVE_FILE   = <span class="str">'received_audio.wav'</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 21–24</div>
+      <strong>Smart default with command-line override:</strong><br>
+      <code>sys.argv</code> is a list of command-line arguments. <code>sys.argv[0]</code> is the script name, <code>sys.argv[1]</code> is the first argument if provided.<br>
+      <code>python phase1_client.py 192.168.1.5</code> → <code>SERVER_IP = '192.168.1.5'</code><br>
+      <code>python phase1_client.py</code> → <code>SERVER_IP = '127.0.0.1'</code> (loopback — same machine)<br>
+      <code>127.0.0.1</code> always means "this same computer" — useful when both programs run locally.
+    </div>
+  </div>
+</div>
+
+<!-- CONNECT -->
+<div class="ann-block section-start">
+  <div class="ann-section">🔌 Step 1 — Connect to the server</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">def</span> <span class="fn">receive_and_play</span>():
+    <span class="fn">print</span>(<span class="fn">f</span><span class="str">"[CLIENT] Connecting..."</span>)
+
+    sock = socket.socket(
+        socket.AF_INET,
+        socket.SOCK_STREAM
+    )
+    sock.connect((SERVER_IP, SERVER_PORT))
+    <span class="fn">print</span>(<span class="str">"[CLIENT] Connected!"</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 28–33</div>
+      <strong>Create a client socket and connect:</strong><br>
+      The client socket is created the same way as the server socket — <code>AF_INET</code> (IPv4) + <code>SOCK_STREAM</code> (TCP).<br>
+      But notice: <strong>no bind(), no listen()</strong>. The client just calls <code>connect()</code>. The OS automatically assigns the client an ephemeral port (e.g., 43201) — the client doesn't need a well-known port.<br>
+      <code>connect()</code> sends the TCP SYN packet that initiates the handshake. This line blocks until the server accepts or it times out.
+    </div>
+  </div>
+</div>
+
+<!-- READ METADATA -->
+<div class="ann-block section-start">
+  <div class="ann-section">📋 Step 2 — Read the metadata header</div>
+  <div class="ann-row">
+    <div class="ann-code">meta_buf = <span class="fn">b</span><span class="str">''</span>
+<span class="kw">while</span> <span class="fn">b</span><span class="str">'\n'</span> <span class="kw">not in</span> meta_buf:
+    meta_buf += sock.recv(<span class="num">1</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 36–38</div>
+      <strong>Read one byte at a time until we see a newline:</strong><br>
+      The server sends the metadata line like <code>"1,2,44100,220500\n"</code>. We don't know how many bytes it is, so we read one byte at a time and stop when we see <code>\n</code>.<br>
+      <code>sock.recv(1)</code> reads exactly 1 byte from the socket. This is slow but safe — we do it only for this short metadata line, not for the audio.<br>
+      <code>meta_buf += ...</code> appends each byte to a growing bytes object.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">meta_line = meta_buf.decode().strip()
+channels, sampwidth, framerate, n_frames \
+    = <span class="fn">map</span>(<span class="fn">int</span>, meta_line.split(<span class="str">','</span>))</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 40–41</div>
+      <strong>Parse the metadata string into four numbers:</strong><br>
+      <code>.decode()</code> converts bytes → string: <code>b"1,2,44100,220500\n"</code> → <code>"1,2,44100,220500\n"</code><br>
+      <code>.strip()</code> removes the trailing newline: <code>"1,2,44100,220500"</code><br>
+      <code>.split(',')</code> splits on commas: <code>['1', '2', '44100', '220500']</code><br>
+      <code>map(int, ...)</code> converts each string to an integer.<br>
+      Python's multiple assignment unpacks the four values into four variables in one line.
+    </div>
+  </div>
+</div>
+
+<!-- PYAUDIO -->
+<div class="ann-block section-start">
+  <div class="ann-section">🔊 Step 3 — Set up live audio playback (optional)</div>
+  <div class="ann-row">
+    <div class="ann-code">player = <span class="kw">None</span>
+<span class="kw">try</span>:
+    <span class="kw">import</span> pyaudio
+    pa = pyaudio.PyAudio()
+    fmt_map = {
+        <span class="num">1</span>: pyaudio.paInt8,
+        <span class="num">2</span>: pyaudio.paInt16,
+        <span class="num">4</span>: pyaudio.paInt32
+    }
+    pa_format = fmt_map.get(
+        sampwidth, pyaudio.paInt16
+    )</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 46–52</div>
+      <strong>Try to set up live audio output with PyAudio:</strong><br>
+      <code>player = None</code> — default to no player. We only set it if PyAudio is available.<br>
+      <code>try: import pyaudio</code> — PyAudio is an optional dependency. If it's not installed, the <code>except ImportError</code> block handles it gracefully.<br>
+      <code>pyaudio.PyAudio()</code> initialises the audio system and talks to the OS's audio driver.<br>
+      <code>fmt_map</code> translates our WAV sample width (bytes) into the PyAudio format constant. For 2-byte (16-bit) audio, we need <code>paInt16</code>.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">    player = pa.open(
+        format=pa_format,
+        channels=channels,
+        rate=framerate,
+        output=<span class="kw">True</span>,
+        frames_per_buffer=CHUNK_SIZE
+    )
+<span class="kw">except</span> ImportError:
+    <span class="fn">print</span>(<span class="str">"PyAudio not installed"</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 54–65</div>
+      <strong>Open the audio output stream:</strong><br>
+      <code>pa.open()</code> opens a channel to the computer's speakers with the exact same format as the WAV file. This is critical — the format must match or the audio will sound garbled.<br>
+      <code>output=True</code> tells PyAudio this stream is for playback (not recording).<br>
+      <code>frames_per_buffer=4096</code> — PyAudio's internal buffer size matches our network chunk size.<br>
+      If PyAudio isn't installed, <code>player</code> stays <code>None</code> and we fall back to disk-only saving.
+    </div>
+  </div>
+</div>
+
+<!-- RECEIVE LOOP -->
+<div class="ann-block section-start">
+  <div class="ann-section">📥 Step 4 — Receive audio chunks and play them live</div>
+  <div class="ann-row">
+    <div class="ann-code">all_frames  = []
+chunk_num   = <span class="num">0</span>
+total_bytes = <span class="num">0</span>
+
+<span class="kw">try</span>:
+    <span class="kw">while</span> <span class="kw">True</span>:
+        data = sock.recv(CHUNK_SIZE)
+        <span class="kw">if not</span> data:
+            <span class="kw">break</span></div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 68–76</div>
+      <strong>The receiving loop — mirrors the server's sending loop:</strong><br>
+      <code>all_frames = []</code> — a list that collects every chunk. We need this to save to a WAV file at the end.<br>
+      <code>sock.recv(CHUNK_SIZE)</code> asks for up to 4096 bytes from the socket. It blocks until some data arrives.<br>
+      <code>if not data: break</code> — when the server closes the connection after the file ends, <code>recv()</code> returns an empty bytes object (<code>b''</code>), signalling end of stream.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code">        all_frames.append(data)
+        total_bytes += <span class="fn">len</span>(data)
+        chunk_num += <span class="num">1</span>
+
+        <span class="kw">if</span> player:
+            player.write(data)
+
+        <span class="kw">if</span> chunk_num % <span class="num">20</span> == <span class="num">0</span>:
+            kb = total_bytes / <span class="num">1024</span>
+            <span class="fn">print</span>(<span class="fn">f</span><span class="str">"{chunk_num} chunks"</span>,
+                  end=<span class="str">'\r'</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 78–89</div>
+      <strong>For each received chunk, do three things:</strong><br>
+      1. <code>all_frames.append(data)</code> — save a copy for later WAV writing.<br>
+      2. <code>player.write(data)</code> — if PyAudio is available, push the bytes straight to the speakers. The audio plays as it arrives over the network.<br>
+      3. <code>if chunk_num % 20 == 0:</code> — print a progress update every 20 chunks. <code>end='\r'</code> overwrites the same terminal line instead of printing a new one each time.
+    </div>
+  </div>
+</div>
+
+<div class="ann-block">
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">except</span> KeyboardInterrupt:
+    <span class="fn">print</span>(<span class="str">"\n[CLIENT] Stopped."</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 91–92</div>
+      <code>KeyboardInterrupt</code> is raised when the user presses <strong>Ctrl+C</strong> in the terminal. Catching it lets us stop gracefully — saving whatever audio was received — instead of crashing with a traceback.
+    </div>
+  </div>
+</div>
+
+<!-- SAVE -->
+<div class="ann-block section-start">
+  <div class="ann-section">💾 Step 5 — Save received audio to a WAV file</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">if</span> all_frames:
+    <span class="kw">with</span> wave.open(SAVE_FILE, <span class="str">'wb'</span>) <span class="kw">as</span> wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sampwidth)
+        wf.setframerate(framerate)
+        wf.writeframes(
+            <span class="fn">b</span><span class="str">''</span>.join(all_frames)
+        )</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 95–101</div>
+      <strong>Write everything received to a WAV file for verification:</strong><br>
+      We use exactly the same audio format parameters (<code>channels</code>, <code>sampwidth</code>, <code>framerate</code>) that we received from the server in the metadata header. This guarantees the saved file matches the original.<br>
+      <code>b''.join(all_frames)</code> glues all the received chunks back into one continuous byte string.<br>
+      After this runs, you can open <code>received_audio.wav</code> in any audio player to confirm the stream was received correctly.
+    </div>
+  </div>
+</div>
+
+<!-- CLEANUP -->
+<div class="ann-block last">
+  <div class="ann-section">🧹 Cleanup — release resources</div>
+  <div class="ann-row">
+    <div class="ann-code"><span class="kw">if</span> player:
+    player.stop_stream()
+    player.close()
+    pa.terminate()
+
+sock.close()
+<span class="fn">print</span>(<span class="fn">f</span><span class="str">"Done. {total_bytes/1024:.1f} KB"</span>)</div>
+    <div class="ann-explain">
+      <div class="ann-label">Lines 105–111</div>
+      <strong>Always release resources when done:</strong><br>
+      <code>player.stop_stream()</code> stops the audio output.<br>
+      <code>player.close()</code> releases the audio hardware.<br>
+      <code>pa.terminate()</code> shuts down the PyAudio library fully.<br>
+      <code>sock.close()</code> closes the TCP connection. The OS will eventually reclaim it anyway, but explicit cleanup is good practice.<br>
+      If you don't close sockets, your program can hit "Too many open files" errors after many connections.
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 5: RUNTIME SEQUENCE
+══════════════════════════════════════════════════════════ -->
+<h2>What Happens at Runtime</h2>
+<p>Run <code>python phase1_server.py</code> in one terminal and <code>python phase1_client.py</code> in another. Here is the exact sequence of events:</p>
+
+<div class="seq">
+  <!-- Headers -->
+  <div class="seq-col-hd srv">SERVER</div>
+  <div class="seq-mid-hd"></div>
+  <div class="seq-col-hd cli">CLIENT</div>
+
+  <!-- Row 1 -->
+  <div class="seq-cell srv">Creates TCP socket, binds to port 5004, calls <code>listen()</code>.<br><span class="seq-msg">→ Blocked at accept()</span></div>
+  <div class="seq-arrow"></div>
+  <div class="seq-cell empty"></div>
+
+  <!-- Row 2 -->
+  <div class="seq-cell empty"></div>
+  <div class="seq-arrow"></div>
+  <div class="seq-cell cli">Creates socket, calls <code>connect('127.0.0.1', 5004)</code>. OS performs TCP 3-way handshake.</div>
+
+  <!-- Row 3 -->
+  <div class="seq-cell srv"><code>accept()</code> returns a new socket <code>conn</code>. Calls <code>stream_audio(conn, addr)</code>.</div>
+  <div class="seq-arrow right">←→</div>
+  <div class="seq-cell cli">Connection established. <code>Connected!</code></div>
+
+  <!-- Row 4 -->
+  <div class="seq-cell srv">Opens WAV file, reads metadata, sends <code>"1,2,44100,220500\n"</code></div>
+  <div class="seq-arrow right">→</div>
+  <div class="seq-cell cli">Reads one byte at a time until <code>\n</code>. Parses 4 integers.<br><span class="seq-msg">Sets up PyAudio stream</span></div>
+
+  <!-- Row 5 -->
+  <div class="seq-cell srv">Reads 4096 frames from WAV → sends raw bytes → sleeps 46 ms</div>
+  <div class="seq-arrow right">→</div>
+  <div class="seq-cell cli">Receives chunk → appends to list → writes to speaker</div>
+
+  <!-- Row 6 -->
+  <div class="seq-cell srv">Reads next 4096 frames → sends → sleeps 46 ms…</div>
+  <div class="seq-arrow right">→</div>
+  <div class="seq-cell cli">Receives chunk → plays → saves…</div>
+
+  <!-- Row 7 -->
+  <div class="seq-cell srv">Reaches end of WAV file. <code>readframes()</code> returns <code>b''</code>. Loop breaks. <code>conn.close()</code></div>
+  <div class="seq-arrow">↓</div>
+  <div class="seq-cell cli"><code>recv()</code> returns <code>b''</code>. Loop breaks. Saves <code>received_audio.wav</code>. Prints total bytes.</div>
+</div>
+
+<div class="callout green">
+  <strong>The timing is the magic:</strong> The server's <code>time.sleep()</code> and the client's <code>player.write()</code> together create the illusion of smooth real-time audio. The server releases chunks at the same rate they were recorded; the client feeds them to the speaker at the same rate. The result is seamless playback across a network.
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 6: WHAT RTSP/RTP ADDS
+══════════════════════════════════════════════════════════ -->
+<h2>Why We Upgraded to RTSP/RTP</h2>
+
+<p>Phase 1 works but has limitations that professional streaming systems need to solve. RTSP/RTP was invented specifically to solve them.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">No Pause or Seek in Phase 1</div>
+      <div class="step-desc">Once the server starts sending, there's no way to pause or resume. RTSP adds PAUSE and PLAY commands on a separate control channel — you can pause the stream without dropping the connection.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">No Session Identification</div>
+      <div class="step-desc">Phase 1 has no session concept — if you reconnect, the server has no idea who you are. RTSP assigns a <code>Session: 482931</code> ID on SETUP, so the server tracks each client's state independently.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">TCP Is Not Ideal for Audio Data</div>
+      <div class="step-desc">TCP re-transmits lost packets, which causes audio gaps. Phase 2 sends audio over UDP — if a packet is lost, the next one arrives on time instead of stalling. RTP adds sequence numbers so the client can detect lost packets.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">No Stream Description</div>
+      <div class="step-desc">Phase 1's metadata is a single custom text line. RTSP uses SDP (Session Description Protocol, RFC 4566) — a standardised format that any RFC-compliant player (VLC, QuickTime, ffmpeg) can understand.</div>
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-body">
+      <div class="step-title">Single-Client Only</div>
+      <div class="step-desc">Phase 1's <code>run_server()</code> handles one client at a time. Phase 2 spawns a new <code>threading.Thread</code> for each incoming connection, allowing many clients to receive the stream simultaneously.</div>
+    </div>
+  </div>
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 7: COMMON QUESTIONS — LANGUAGE & IDE
+══════════════════════════════════════════════════════════ -->
+<h2>Questions You Will Definitely Be Asked</h2>
+<p>These three questions come up in almost every class project presentation. Here are complete, confident answers.</p>
+
+<div class="qa-block">
+
+  <!-- Q1: PROGRAMMING LANGUAGE -->
+  <div class="qa-card">
+    <div class="qa-q">
+      <span class="qa-q-label">Q1</span>
+      <span class="qa-q-text">What programming language did you use, and why did you choose it?</span>
+    </div>
+    <div class="qa-a">
+      <div class="lang-badge">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M9.5 2a.5.5 0 0 1 .5.5v3a.5.5 0 0 1-.5.5H8v1h5a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1v-3a1 1 0 0 1 1-1h1V6H6.5a.5.5 0 0 1-.5-.5v-3a.5.5 0 0 1 .5-.5h3zM7 10v3h5v-3H7z"/></svg>
+        Python 3
+      </div>
+      <p>We used <strong>Python 3</strong>. Python was the right choice for this project for the following reasons:</p>
+      <div class="why-grid">
+        <div class="why-item">
+          <div class="wi-num">Networking</div>
+          <div class="wi-text">Python's built-in <strong><code>socket</code> module</strong> gives direct access to the OS's TCP and UDP networking stack — no third-party library needed. We could open sockets, bind ports, send raw bytes, and implement the RTSP protocol exactly as RFC 2326 specifies.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Audio</div>
+          <div class="wi-text">The <strong><code>wave</code> module</strong> (also built-in) reads and writes WAV files natively. The <strong><code>struct</code> module</strong> lets us pack the 12-byte RTP header as raw binary — <code>struct.pack('!BBHII', ...)</code> — without writing a single line of C.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Concurrency</div>
+          <div class="wi-text">The <strong><code>threading</code> module</strong> lets the server handle multiple clients at once — each connection gets its own thread for the streaming loop — and lets Django run the RTP receiver in the background.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Web UI</div>
+          <div class="wi-text"><strong>Django 5.1</strong> let us build a professional web dashboard with a REST API in hours. The dashboard shows the live RTSP protocol flow, packet counters, and audio waveform — all in the same language as the networking code.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Readability</div>
+          <div class="wi-text">Python's syntax is close to plain English. When we present <code>conn.sendall(metadata.encode())</code>, the audience immediately understands "send the metadata to the connection." A C or Java equivalent would need three times as many lines.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Rapid Development</div>
+          <div class="wi-text">We implemented a complete, working RTSP server in roughly 200 lines of Python. The same in C would be 2,000+ lines with manual memory management. For a group project with a deadline, Python's speed of development was essential.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Cross-Platform</div>
+          <div class="wi-text">The same code runs on Windows, macOS, and Linux with no changes. Every team member could run the server and client on their own laptop regardless of operating system.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Focus on Concepts</div>
+          <div class="wi-text">This is a <strong>Distributed Systems</strong> course — the topic is protocols, not memory management. Python lets us focus on <em>what</em> RTSP does rather than fighting the language to make it work.</div>
+        </div>
+      </div>
+      <p style="margin-top:.6rem"><em>One-sentence answer if pressed for time: "We used Python 3 because its built-in <code>socket</code> module lets us implement the RTSP protocol at the byte level, while Django gave us the web dashboard in the same codebase."</em></p>
+    </div>
+  </div>
+
+  <!-- Q2: IDE -->
+  <div class="qa-card">
+    <div class="qa-q">
+      <span class="qa-q-label">Q2</span>
+      <span class="qa-q-text">What IDE did you use, and why did you choose it?</span>
+    </div>
+    <div class="qa-a">
+      <div class="ide-badge">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M1 2a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2zm15-1a2 2 0 0 0-2-2H2a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V1zM4.854 4.146a.5.5 0 0 0-.708.708L7.293 8l-3.147 3.146a.5.5 0 0 0 .708.708L8 8.707l3.146 3.147a.5.5 0 0 0 .708-.708L8.707 8l3.147-3.146a.5.5 0 0 0-.708-.708L8 7.293 4.854 4.146z"/></svg>
+        Visual Studio Code (VS Code)
+      </div>
+      <p>We used <strong>Visual Studio Code</strong> — a free, open-source code editor made by Microsoft. It was the right choice for this project for the following reasons:</p>
+      <div class="why-grid">
+        <div class="why-item">
+          <div class="wi-num">Free &amp; Accessible</div>
+          <div class="wi-text">VS Code is <strong>completely free</strong>. Every team member could install it on their own machine without a licence — important for a student group project.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Python Extension</div>
+          <div class="wi-text">The <strong>Pylance + Python</strong> extension gives auto-complete, type checking, and inline documentation. When we typed <code>socket.</code>, it showed every available method with descriptions — which was essential for learning the socket API while building.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Integrated Terminal</div>
+          <div class="wi-text">VS Code has a built-in terminal where you can open <strong>multiple terminal panes side by side</strong>. We ran the RTSP server in one terminal and the Django client in another — both visible at once without alt-tabbing.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Simultaneous Files</div>
+          <div class="wi-text">We had <code>rtsp_server.py</code>, <code>player/views.py</code>, and <code>rtp_packet.py</code> open in <strong>split editor panels</strong> at the same time. When a message the server sent didn't match what the client expected, we could see both files side by side.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Git Integration</div>
+          <div class="wi-text">The <strong>Source Control panel</strong> shows every changed file with a diff. We used it to track which team member changed what and to create commits before each presentation rehearsal.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Syntax Highlighting</div>
+          <div class="wi-text">Keywords, strings, function names, and comments all have different colours. When reviewing the RTSP response parser, the coloured regex pattern <code>r'Session:\s*(\S+)'</code> was immediately readable — a plain text editor would make it a wall of characters.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Lightweight</div>
+          <div class="wi-text">VS Code starts in seconds. Heavier IDEs like PyCharm or Eclipse take minutes to index a project. When debugging a live RTSP session, speed of iteration matters — we needed to edit a line and re-run the server immediately.</div>
+        </div>
+        <div class="why-item">
+          <div class="wi-num">Django Support</div>
+          <div class="wi-text">The Django extension understands template tags (<code>{% url %}</code>, <code>{% block %}</code>), highlights them correctly, and provides navigation between views and their templates — which helped build the dashboard UI faster.</div>
+        </div>
+      </div>
+      <p style="margin-top:.6rem"><em>One-sentence answer if pressed for time: "We used VS Code because it's free, has excellent Python support, and lets us run the server and client side by side in split terminal panes while editing the code."</em></p>
+    </div>
+  </div>
+
+  <!-- Q3: EXPLAIN THE CODE -->
+  <div class="qa-card">
+    <div class="qa-q">
+      <span class="qa-q-label">Q3</span>
+      <span class="qa-q-text">Can you explain what each line of code does?</span>
+    </div>
+    <div class="qa-a">
+      <p><strong>Yes — that's what the rest of this page is for.</strong> Scroll down to the annotated walkthrough sections to find every line explained in plain English.</p>
+      <div class="steps" style="margin-top:.7rem">
+        <div class="step">
+          <div class="step-body">
+            <div class="step-title"><code>phase1_server.py</code> — Full Line-by-Line Walkthrough</div>
+            <div class="step-desc">All 111 lines grouped into logical sections: imports → config → WAV generation → stream_audio() → run_server(). Each group shows the code on the left and the explanation on the right.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-body">
+            <div class="step-title"><code>phase1_client.py</code> — Full Line-by-Line Walkthrough</div>
+            <div class="step-desc">All 115 lines: imports → config → connect → read metadata → PyAudio setup → receive loop → WAV save → cleanup. Same annotated format.</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-body">
+            <div class="step-title">Runtime Sequence Table</div>
+            <div class="step-desc">Shows exactly what server and client do at each moment — from socket creation through connection teardown — so you can narrate the execution as if you're watching it in a debugger.</div>
+          </div>
+        </div>
+      </div>
+      <p class="callout blue" style="margin-top:.8rem"><strong>Tip:</strong> When asked to "explain a line," don't just read the code aloud. Say what <em>problem</em> that line solves. For example, instead of "this calls time.sleep()", say "this pause makes the server send audio at the same rate it's meant to be played — without it, the file would arrive in milliseconds and the client couldn't keep up."</p>
+    </div>
+  </div>
+
+</div>
+
+<hr class="div">
+
+<!-- ══════════════════════════════════════════════════════════
+     SECTION 7: PRESENTATION TALKING POINTS
+══════════════════════════════════════════════════════════ -->
+<h2>Presentation Talking Points</h2>
+<p>Use these when presenting to the class. Each point answers a question the professor or classmates might ask.</p>
+
+<div class="tp-grid">
+  <div class="tp-card">
+    <div class="tp-num">Opening Hook</div>
+    <div class="tp-title">Start with the problem, not the solution</div>
+    <div class="tp-text"><em>"Every time you play a Spotify song or watch a YouTube video, your device is receiving audio data over a network in real time. Today we built that system from scratch in Python — starting with just 80 lines of code and building up to the same protocol that VLC and QuickTime use."</em></div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">On Sockets</div>
+    <div class="tp-title">When explaining <code>socket.socket()</code></div>
+    <div class="tp-text"><em>"A socket is just a two-way pipe between two computers. The server creates one end and waits. The client creates the other end and reaches out. Once connected, both sides just read and write bytes — they don't care about the network underneath."</em></div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">On PCM Audio</div>
+    <div class="tp-title">When explaining the audio format</div>
+    <div class="tp-text"><em>"Sound is air pressure changing over time. PCM audio is just 44,100 measurements of air pressure per second, each stored as a 16-bit number. A 3-minute song is about 31 million numbers. We're sending those numbers across the network."</em></div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">On time.sleep()</div>
+    <div class="tp-title">When explaining the pacing formula</div>
+    <div class="tp-text"><em>"Without this sleep, we'd blast the entire audio file across the network in half a second and the client's audio buffer would overflow. The sleep makes us send audio at the same rate it should be played — 4,096 frames takes about 46 milliseconds to play, so we wait 46 ms between sends."</em></div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">On RTSP/RTP</div>
+    <div class="tp-title">Connecting Phase 1 to Phase 2</div>
+    <div class="tp-text"><em>"Phase 1 proves the concept works. Phase 2 does it properly: RTSP gives us commands like a TV remote — DESCRIBE, SETUP, PLAY, PAUSE, TEARDOWN. RTP adds sequence numbers so the client knows if a packet was lost. And we put it all in a Django web dashboard so you can see the protocol happening live."</em></div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">CORBA Link</div>
+    <div class="tp-title">Connecting to the course topic</div>
+    <div class="tp-text"><em>"Like CORBA, RTSP is a distributed middleware protocol — it defines how two separate programs talk to each other across a network. CORBA uses IDL to describe object interfaces; RTSP uses SDP to describe audio streams. Both solve the same distributed systems problem: how do two programs agree on what they're sharing before they start sharing it?"</em></div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">Live Demo</div>
+    <div class="tp-title">What to show during the demo</div>
+    <div class="tp-text">Open the dashboard at <code>localhost:8000</code>. Click <strong>Launch Server</strong> — show the log: "Waiting for clients." Click <strong>Play</strong> — show the DESCRIBE → SETUP → PLAY sequence lighting up. Point to the RTP packet counter incrementing. Play <em>Puul</em> by Lasmid through the browser. Show the Protocol Flow diagram animating.</div>
+  </div>
+  <div class="tp-card">
+    <div class="tp-num">If Asked</div>
+    <div class="tp-title">Why Python and not C/Java?</div>
+    <div class="tp-text"><em>"Python's <code>socket</code> module gives direct access to the OS networking stack, the same as C would. Python lets us build the protocol layer clearly without memory management overhead — the important thing is the protocol logic, not the language."</em></div>
+  </div>
+</div>
+
+<div class="callout" style="margin-top:2rem">
+  <strong>Pro tip for the demo:</strong> Have <code>python manage.py runserver</code> already running before the presentation. Open the dashboard in a browser tab. Have the <a href="/docs">/docs</a> page open in another tab. Walk through both during the presentation — show the live dashboard first (the exciting part), then explain the code using the annotated walkthrough.
+</div>
+
+</div><!-- .page -->
+
+<script>
+// ── Theme ──────────────────────────────────────────────────
+const root = document.documentElement;
+let theme = localStorage.getItem('theme') ||
+  (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+root.dataset.theme = theme;
+function toggleTheme() {
+  theme = theme === 'dark' ? 'light' : 'dark';
+  root.dataset.theme = theme;
+  localStorage.setItem('theme', theme);
+}
+
+// ── Progress bar ───────────────────────────────────────────
+const prog = document.getElementById('prog');
+window.addEventListener('scroll', () => {
+  const pct = scrollY / (document.body.scrollHeight - innerHeight) * 100;
+  prog.style.width = Math.min(pct, 100) + '%';
+}, { passive: true });
+</script>
+</body>
+</html>

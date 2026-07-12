@@ -4,6 +4,7 @@ from . import views
 urlpatterns = [
     path('',                    views.index,          name='index'),
     path('docs',                views.docs,           name='docs'),
+    path('walkthrough',         views.walkthrough,    name='walkthrough'),
     path('api/server/start',    views.server_start),
     path('api/server/stop',     views.server_stop),
     path('api/rtsp/connect',    views.rtsp_connect),
