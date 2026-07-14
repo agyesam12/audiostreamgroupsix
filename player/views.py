@@ -40,6 +40,7 @@ SONGS = {
 }
 
 _state = {
+    # SERVER → CLIENT (RTSP music streaming)
     'server_running':    False,
     'rtsp_state':        'IDLE',
     'session_id':        None,
@@ -47,18 +48,33 @@ _state = {
     'channels':          1,
     'packets_received':  0,
     'bytes_received':    0,
-    'log':               [],
     'current_song':      'puul',
     'song_title':        'Puul',
     'song_artist':       'Lasmid',
+    # CLIENT → SERVER (microphone streaming)
+    'mic_server_running': False,
+    'mic_server_pid':     None,
+    'mic_client_running': False,
+    'mic_client_pid':     None,
+    'packets_mic_recv':   0,
+    'bytes_mic_recv':     0,
+    'packets_mic_sent':   0,
+    'bytes_mic_sent':     0,
+    'mic_client_ip':      None,
+    # shared
+    'log':               [],
 }
 
-_server_proc = None
+_server_proc     = None
+_mic_server_proc = None
+_mic_client_proc = None
 _rtsp_sock   = None
 _rtp_sock    = None
 _stop_rtp    = threading.Event()
 _cseq        = 0
 _lock        = threading.Lock()
+
+MIC_PORT = 7000   # UDP port audio_server.py listens on
 
 RTSP_IP   = '127.0.0.1'
 RTSP_PORT = 8554
@@ -479,7 +495,127 @@ def rtsp_teardown(request):
 def api_status(request):
     data = dict(_state)
     data['songs'] = {k: {'title': v['title'], 'artist': v['artist']} for k, v in SONGS.items()}
+
+    # Pull live mic stats from status files written by subprocesses
+    import json as _json
+    for fname, recv_key, sent_key in [
+        ('audio_server_status.json', 'packets_mic_recv', 'bytes_mic_recv'),
+        ('mic_client_status.json',   'packets_mic_sent', 'bytes_mic_sent'),
+    ]:
+        path = os.path.join(BASE_DIR, fname)
+        try:
+            with open(path) as f:
+                s = _json.load(f)
+            if fname == 'audio_server_status.json':
+                _state['packets_mic_recv'] = s.get('packets', 0)
+                _state['bytes_mic_recv']   = s.get('bytes', 0)
+                _state['mic_client_ip']    = s.get('client_ip')
+            else:
+                _state['packets_mic_sent'] = s.get('packets', 0)
+                _state['bytes_mic_sent']   = s.get('bytes', 0)
+        except Exception:
+            pass
+
+    data.update({
+        'packets_mic_recv': _state['packets_mic_recv'],
+        'bytes_mic_recv':   _state['bytes_mic_recv'],
+        'packets_mic_sent': _state['packets_mic_sent'],
+        'bytes_mic_sent':   _state['bytes_mic_sent'],
+        'mic_client_ip':    _state['mic_client_ip'],
+    })
     return JsonResponse(data)
+
+
+# ── Microphone streaming (CLIENT → SERVER) ─────────────────────────────────────
+
+@csrf_exempt
+def mic_server_start(request):
+    """Start audio_server.py — receives mic audio from clients and plays it."""
+    global _mic_server_proc
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    with _lock:
+        if _mic_server_proc and _mic_server_proc.poll() is None:
+            return JsonResponse({'status': 'already_running', 'pid': _mic_server_proc.pid})
+        script   = os.path.join(BASE_DIR, 'audio_server.py')
+        log_path = os.path.join(BASE_DIR, 'audio_server.log')
+        log_fh   = open(log_path, 'w', encoding='utf-8')
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUTF8']       = '1'
+        _mic_server_proc = subprocess.Popen(
+            [sys.executable, '-u', script],
+            stdout=log_fh, stderr=log_fh,
+            cwd=BASE_DIR, env=env,
+        )
+        _state['mic_server_running'] = True
+        _state['mic_server_pid']     = _mic_server_proc.pid
+        _log(f'[MIC SERVER] Audio receiver started  PID={_mic_server_proc.pid}', 'server')
+        _log(f'[MIC SERVER] Listening on UDP port {MIC_PORT} for mic audio', 'server')
+    return JsonResponse({'status': 'started', 'pid': _mic_server_proc.pid})
+
+
+@csrf_exempt
+def mic_server_stop(request):
+    """Stop audio_server.py."""
+    global _mic_server_proc
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    with _lock:
+        if _mic_server_proc:
+            _mic_server_proc.terminate()
+            _mic_server_proc = None
+        _state['mic_server_running'] = False
+        _state['mic_server_pid']     = None
+        _state['packets_mic_recv']   = 0
+        _state['bytes_mic_recv']     = 0
+        _log('[MIC SERVER] Audio receiver stopped.', 'server')
+    return JsonResponse({'status': 'stopped'})
+
+
+@csrf_exempt
+def mic_client_start(request):
+    """Start mic_client.py — captures microphone and sends to audio_server."""
+    global _mic_client_proc
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    with _lock:
+        if _mic_client_proc and _mic_client_proc.poll() is None:
+            return JsonResponse({'status': 'already_running', 'pid': _mic_client_proc.pid})
+        script   = os.path.join(BASE_DIR, 'mic_client.py')
+        log_path = os.path.join(BASE_DIR, 'mic_client.log')
+        log_fh   = open(log_path, 'w', encoding='utf-8')
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUTF8']       = '1'
+        _mic_client_proc = subprocess.Popen(
+            [sys.executable, '-u', script, '127.0.0.1'],
+            stdout=log_fh, stderr=log_fh,
+            cwd=BASE_DIR, env=env,
+        )
+        _state['mic_client_running'] = True
+        _state['mic_client_pid']     = _mic_client_proc.pid
+        _log(f'[MIC CLIENT] Mic capture started  PID={_mic_client_proc.pid}', 'client')
+        _log(f'[MIC CLIENT] Sending mic audio to 127.0.0.1:{MIC_PORT}', 'client')
+    return JsonResponse({'status': 'started', 'pid': _mic_client_proc.pid})
+
+
+@csrf_exempt
+def mic_client_stop(request):
+    """Stop mic_client.py."""
+    global _mic_client_proc
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    with _lock:
+        if _mic_client_proc:
+            _mic_client_proc.terminate()
+            _mic_client_proc = None
+        _state['mic_client_running'] = False
+        _state['mic_client_pid']     = None
+        _state['packets_mic_sent']   = 0
+        _state['bytes_mic_sent']     = 0
+        _log('[MIC CLIENT] Mic capture stopped.', 'client')
+    return JsonResponse({'status': 'stopped'})
 
 
 @csrf_exempt
