@@ -755,7 +755,7 @@ async function micCliStart() {
     S.micCliOn = true;
     document.getElementById('dot-mic-cli').classList.add('on-c2s');
     document.getElementById('lbl-mic-cli').textContent = 'Capturing';
-    document.getElementById('pid-mic-cli').textContent = d.pid ? `PID ${d.pid}` : '';
+    document.getElementById('pid-mic-cli').textContent = d.pid ? `PID ${d.pid}  →  ${d.server_ip||serverIp}:7000` : '';
     document.getElementById('btn-mic-cli-start').disabled = true;
     document.getElementById('btn-mic-cli-stop').disabled = false;
     setMicUI(true);
