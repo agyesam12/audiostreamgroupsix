@@ -1,0 +1,16 @@
+[AUDIO SERVER] Audio output: pyaudio
+[AUDIO SERVER] Listening on UDP port 7000
+[AUDIO SERVER] Waiting for microphone audio from clients...
+[AUDIO SERVER] Stream from 127.0.0.1:56568
+[AUDIO SERVER] Packets: 100  Bytes: 204800
+[AUDIO SERVER] Packets: 200  Bytes: 409600
+[AUDIO SERVER] Packets: 300  Bytes: 614400
+[AUDIO SERVER] Packets: 400  Bytes: 819200
+[AUDIO SERVER] Packets: 500  Bytes: 1024000
+[AUDIO SERVER] Packets: 600  Bytes: 1228800
+Traceback (most recent call last):
+  File "C:\Users\agyes\groupsixdistributedsystemfolder\audio_server.py", line 167, in <module>
+    main()
+  File "C:\Users\agyes\groupsixdistributedsystemfolder\audio_server.py", line 133, in main
+    continue
+KeyboardInterrupt
