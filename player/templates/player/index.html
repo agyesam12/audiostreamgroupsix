@@ -440,6 +440,16 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
 
     <!-- Mic client status -->
     <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.35rem;margin-top:.8rem">Step 2 — Mic Capture (Client Side)</div>
+
+    <!-- Server IP input for multi-laptop testing -->
+    <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.55rem">
+      <label style="font-size:.68rem;color:var(--muted);white-space:nowrap;flex-shrink:0">Server IP:</label>
+      <input type="text" id="mic-server-ip" value="127.0.0.1" placeholder="192.168.x.x"
+        style="flex:1;background:var(--card2);border:1px solid rgba(6,182,212,.3);border-radius:7px;
+               color:var(--c2s);font-family:'Courier New',monospace;font-size:.75rem;
+               padding:.38rem .6rem;outline:none;width:100%">
+    </div>
+
     <div class="srv-status">
       <div class="dot" id="dot-mic-cli"></div>
       <span class="dot-label" id="lbl-mic-cli">Not capturing</span>
@@ -735,7 +745,12 @@ async function micSrvStop() {
 }
 
 async function micCliStart() {
-  const d = await post('/api/mic/client/start');
+  const serverIp = (document.getElementById('mic-server-ip').value || '127.0.0.1').trim();
+  const d = await fetch('/api/mic/client/start', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({server_ip: serverIp}),
+  }).then(r => r.json());
   if (d.status === 'started' || d.status === 'already_running') {
     S.micCliOn = true;
     document.getElementById('dot-mic-cli').classList.add('on-c2s');

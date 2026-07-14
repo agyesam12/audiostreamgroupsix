@@ -575,10 +575,20 @@ def mic_server_stop(request):
 
 @csrf_exempt
 def mic_client_start(request):
-    """Start mic_client.py — captures microphone and sends to audio_server."""
+    """Start mic_client.py — captures microphone and sends to audio_server.
+    Accepts optional JSON body: {"server_ip": "192.168.x.x"}
+    Defaults to 127.0.0.1 if no IP provided.
+    """
     global _mic_client_proc
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
+    import json as _json
+    try:
+        body      = _json.loads(request.body) if request.body else {}
+        server_ip = body.get('server_ip', '127.0.0.1').strip() or '127.0.0.1'
+    except Exception:
+        server_ip = '127.0.0.1'
+
     with _lock:
         if _mic_client_proc and _mic_client_proc.poll() is None:
             return JsonResponse({'status': 'already_running', 'pid': _mic_client_proc.pid})
@@ -589,15 +599,16 @@ def mic_client_start(request):
         env['PYTHONIOENCODING'] = 'utf-8'
         env['PYTHONUTF8']       = '1'
         _mic_client_proc = subprocess.Popen(
-            [sys.executable, '-u', script, '127.0.0.1'],
+            [sys.executable, '-u', script, server_ip],
             stdout=log_fh, stderr=log_fh,
             cwd=BASE_DIR, env=env,
         )
         _state['mic_client_running'] = True
         _state['mic_client_pid']     = _mic_client_proc.pid
         _log(f'[MIC CLIENT] Mic capture started  PID={_mic_client_proc.pid}', 'client')
-        _log(f'[MIC CLIENT] Sending mic audio to 127.0.0.1:{MIC_PORT}', 'client')
-    return JsonResponse({'status': 'started', 'pid': _mic_client_proc.pid})
+        _log(f'[MIC CLIENT] Sending mic audio to {server_ip}:{MIC_PORT}', 'client')
+    return JsonResponse({'status': 'started', 'pid': _mic_client_proc.pid,
+                         'server_ip': server_ip})
 
 
 @csrf_exempt
