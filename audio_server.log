@@ -1,9 +1,46 @@
 [AUDIO SERVER] Audio output: pyaudio
 [AUDIO SERVER] Listening on UDP port 7000
 [AUDIO SERVER] Waiting for microphone audio from clients...
-Traceback (most recent call last):
-  File "C:\Users\agyes\groupsixdistributedsystemfolder\audio_server.py", line 167, in <module>
-    main()
-  File "C:\Users\agyes\groupsixdistributedsystemfolder\audio_server.py", line 133, in main
-    continue
-KeyboardInterrupt
+[AUDIO SERVER] Stream from 127.0.0.1:55414
+[AUDIO SERVER] Packets: 100  Bytes: 204800
+[AUDIO SERVER] Packets: 200  Bytes: 409600
+[AUDIO SERVER] Packets: 300  Bytes: 614400
+[AUDIO SERVER] Packets: 400  Bytes: 819200
+[AUDIO SERVER] Packets: 500  Bytes: 1024000
+[AUDIO SERVER] Packets: 600  Bytes: 1228800
+[AUDIO SERVER] Packets: 700  Bytes: 1433600
+[AUDIO SERVER] Packets: 800  Bytes: 1638400
+[AUDIO SERVER] Packets: 900  Bytes: 1843200
+[AUDIO SERVER] Packets: 1000  Bytes: 2048000
+[AUDIO SERVER] Packets: 1100  Bytes: 2252800
+[AUDIO SERVER] Packets: 1200  Bytes: 2457600
+[AUDIO SERVER] Packets: 1300  Bytes: 2662400
+[AUDIO SERVER] Packets: 1400  Bytes: 2867200
+[AUDIO SERVER] Packets: 1500  Bytes: 3072000
+[AUDIO SERVER] Packets: 1600  Bytes: 3276800
+[AUDIO SERVER] Packets: 1700  Bytes: 3481600
+[AUDIO SERVER] Packets: 1800  Bytes: 3686400
+[AUDIO SERVER] Packets: 1900  Bytes: 3891200
+[AUDIO SERVER] Packets: 2000  Bytes: 4096000
+[AUDIO SERVER] Packets: 2100  Bytes: 4300800
+[AUDIO SERVER] Packets: 2200  Bytes: 4505600
+[AUDIO SERVER] Packets: 2300  Bytes: 4710400
+[AUDIO SERVER] Packets: 2400  Bytes: 4915200
+[AUDIO SERVER] Packets: 2500  Bytes: 5120000
+[AUDIO SERVER] Packets: 2600  Bytes: 5324800
+[AUDIO SERVER] Packets: 2700  Bytes: 5529600
+[AUDIO SERVER] Packets: 2800  Bytes: 5734400
+[AUDIO SERVER] Packets: 2900  Bytes: 5939200
+[AUDIO SERVER] Packets: 3000  Bytes: 6144000
+[AUDIO SERVER] Packets: 3100  Bytes: 6348800
+[AUDIO SERVER] Packets: 3200  Bytes: 6553600
+[AUDIO SERVER] Packets: 3300  Bytes: 6758400
+[AUDIO SERVER] Packets: 3400  Bytes: 6963200
+[AUDIO SERVER] Packets: 3500  Bytes: 7168000
+[AUDIO SERVER] Packets: 3600  Bytes: 7372800
+[AUDIO SERVER] Packets: 3700  Bytes: 7577600
+[AUDIO SERVER] Packets: 3800  Bytes: 7782400
+[AUDIO SERVER] Packets: 3900  Bytes: 7987200
+[AUDIO SERVER] Packets: 4000  Bytes: 8192000
+[AUDIO SERVER] Packets: 4100  Bytes: 8396800
+[AUDIO SERVER] Packets: 4200  Bytes: 8601600

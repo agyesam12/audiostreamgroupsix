@@ -1,4 +1,4 @@
-[MIC CLIENT] Target server: 192.168.137.1:7000
+[MIC CLIENT] Target server: 127.0.0.1:7000
 [MIC CLIENT] Recording (pyaudio). Speak into your mic.
 [MIC CLIENT] Sent 100 packets  (204800 bytes)
 [MIC CLIENT] Sent 200 packets  (409600 bytes)
@@ -24,3 +24,21 @@
 [MIC CLIENT] Sent 2200 packets  (4505600 bytes)
 [MIC CLIENT] Sent 2300 packets  (4710400 bytes)
 [MIC CLIENT] Sent 2400 packets  (4915200 bytes)
+[MIC CLIENT] Sent 2500 packets  (5120000 bytes)
+[MIC CLIENT] Sent 2600 packets  (5324800 bytes)
+[MIC CLIENT] Sent 2700 packets  (5529600 bytes)
+[MIC CLIENT] Sent 2800 packets  (5734400 bytes)
+[MIC CLIENT] Sent 2900 packets  (5939200 bytes)
+[MIC CLIENT] Sent 3000 packets  (6144000 bytes)
+[MIC CLIENT] Sent 3100 packets  (6348800 bytes)
+[MIC CLIENT] Sent 3200 packets  (6553600 bytes)
+[MIC CLIENT] Sent 3300 packets  (6758400 bytes)
+[MIC CLIENT] Sent 3400 packets  (6963200 bytes)
+[MIC CLIENT] Sent 3500 packets  (7168000 bytes)
+[MIC CLIENT] Sent 3600 packets  (7372800 bytes)
+[MIC CLIENT] Sent 3700 packets  (7577600 bytes)
+[MIC CLIENT] Sent 3800 packets  (7782400 bytes)
+[MIC CLIENT] Sent 3900 packets  (7987200 bytes)
+[MIC CLIENT] Sent 4000 packets  (8192000 bytes)
+[MIC CLIENT] Sent 4100 packets  (8396800 bytes)
+[MIC CLIENT] Sent 4200 packets  (8601600 bytes)
