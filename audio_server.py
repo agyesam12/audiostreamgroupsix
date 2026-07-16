@@ -26,9 +26,18 @@ MIC_PORT    = 7000          # UDP port clients send mic audio to
 RATE        = 44100
 CHANNELS    = 1
 CHUNK       = 1024
+GAIN        = 4.0           # amplify quiet phone mic audio (increase if still too quiet)
 
 STATUS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'audio_server_status.json')
+
+
+def _amplify(raw: bytes, gain: float) -> bytes:
+    """Multiply every 16-bit PCM sample by gain and clip to int16 range."""
+    n = len(raw) // 2
+    samples = struct.unpack(f'<{n}h', raw[:n * 2])
+    clipped = [max(-32767, min(32767, int(s * gain))) for s in samples]
+    return struct.pack(f'<{n}h', *clipped)
 
 
 def _parse_rtp(data):
@@ -136,7 +145,7 @@ def main():
             if payload is None:
                 continue
 
-            play(payload)
+            play(_amplify(payload, GAIN))
             packets  += 1
             bytes_in += len(payload)
 

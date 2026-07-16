@@ -601,6 +601,39 @@ input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:13px;heigh
     </div>
 
     <audio id="audio-el" preload="auto" style="display:none"></audio>
+
+    <!-- ══ Live Voice Communication ══ -->
+    <div style="font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.45rem;margin-top:1rem;padding-top:.8rem;border-top:1px solid var(--border)">
+      Live Voice &mdash; No Python Needed on Phone
+    </div>
+
+    <!-- Laptop: start/stop server mic -->
+    <div style="display:flex;gap:.4rem;margin-bottom:.4rem">
+      <button class="btn btn-s2c" id="btn-srv-mic-start" onclick="startSrvMic()" style="flex:1;margin:0;font-size:.72rem;padding:.5rem .5rem">
+        &#127908; Start Server Mic
+      </button>
+      <button class="btn btn-danger" id="btn-srv-mic-stop" onclick="stopSrvMic()" disabled style="flex:1;margin:0;font-size:.72rem;padding:.5rem .5rem">
+        &#9209; Stop
+      </button>
+    </div>
+    <div class="srv-status" style="margin-bottom:.6rem">
+      <div class="dot" id="dot-srv-mic"></div>
+      <span style="font-size:.75rem;font-weight:600" id="lbl-srv-mic">Server mic off — click to share laptop mic</span>
+    </div>
+
+    <!-- Phone: listen / send mic -->
+    <div style="display:flex;gap:.4rem">
+      <button class="btn btn-s2c" id="btn-listen-srv" onclick="toggleListenSrv()" style="flex:1;margin:0;font-size:.72rem;padding:.5rem .5rem">
+        &#128266; Listen to Server
+      </button>
+      <button class="btn btn-c2s" id="btn-browser-mic" onclick="toggleBrowserMic()" style="flex:1;margin:0;font-size:.72rem;padding:.5rem .5rem">
+        &#127908; Send My Mic
+      </button>
+    </div>
+    <div style="font-size:.6rem;color:var(--muted);text-align:center;margin-top:.35rem">
+      Phone users: connect to MiFi &rarr; open this dashboard &rarr; tap either button
+    </div>
+    <audio id="srv-mic-audio" style="display:none"></audio>
   </div>
 
   <!-- ══ BOTTOM: Protocol Flow + Log ══ -->
@@ -1006,6 +1039,101 @@ async function poll() {
 
 setInterval(poll, 1000);
 poll();
+
+// ── Server Mic (Laptop mic → Phone browser) ────────────────────────────────
+async function startSrvMic() {
+  const d = await post('/api/server-mic/start');
+  if (d.error) { toast(d.error); return; }
+  document.getElementById('btn-srv-mic-start').disabled = true;
+  document.getElementById('btn-srv-mic-stop').disabled  = false;
+  document.getElementById('dot-srv-mic').classList.add('on');
+  document.getElementById('lbl-srv-mic').textContent = 'Server mic LIVE — phones can now listen';
+}
+
+async function stopSrvMic() {
+  await post('/api/server-mic/stop');
+  document.getElementById('btn-srv-mic-start').disabled = false;
+  document.getElementById('btn-srv-mic-stop').disabled  = true;
+  document.getElementById('dot-srv-mic').classList.remove('on');
+  document.getElementById('lbl-srv-mic').textContent = 'Server mic off';
+  const a = document.getElementById('srv-mic-audio');
+  a.pause(); a.src = '';
+  _listening = false;
+  document.getElementById('btn-listen-srv').textContent = '\u{1F508} Listen to Server';
+}
+
+let _listening = false;
+function toggleListenSrv() {
+  const audio = document.getElementById('srv-mic-audio');
+  const btn   = document.getElementById('btn-listen-srv');
+  if (_listening) {
+    audio.pause(); audio.src = '';
+    _listening = false;
+    btn.textContent = '\u{1F508} Listen to Server';
+  } else {
+    audio.src = '/api/server-mic/stream?' + Date.now();
+    audio.volume = (document.getElementById('vol-range') || {value:75}).value / 100;
+    audio.play().catch(e => toast('Cannot play audio: ' + e.message));
+    _listening = true;
+    btn.textContent = '⏹ Stop Listening';
+  }
+}
+
+// ── Browser Mic (Phone mic → Laptop speakers) ──────────────────────────────
+let _bmCtx = null, _bmProc = null, _bmStream = null, _bmSeq = 0, _bmOn = false;
+
+async function toggleBrowserMic() {
+  _bmOn ? stopBrowserMic() : await startBrowserMic();
+}
+
+async function startBrowserMic() {
+  try {
+    _bmStream = await navigator.mediaDevices.getUserMedia({
+      audio: {channelCount:1, echoCancellation:true, noiseSuppression:true}
+    });
+    _bmCtx  = new (window.AudioContext || window.webkitAudioContext)({sampleRate:44100});
+    const src = _bmCtx.createMediaStreamSource(_bmStream);
+    _bmProc   = _bmCtx.createScriptProcessor(1024, 1, 1);
+
+    _bmProc.onaudioprocess = (e) => {
+      if (!_bmOn) return;
+      const f32 = e.inputBuffer.getChannelData(0);
+      const i16 = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++)
+        i16[i] = Math.max(-32768, Math.min(32767, Math.round(f32[i] * 32767)));
+      // 12-byte RTP header
+      const hdr = new ArrayBuffer(12);
+      const dv  = new DataView(hdr);
+      dv.setUint8(0, 0x80); dv.setUint8(1, 96);
+      dv.setUint16(2, _bmSeq & 0xFFFF, false);
+      dv.setUint32(4, (_bmSeq * 1024) & 0xFFFFFFFF, false);
+      dv.setUint32(8, 0x42524F57, false);
+      _bmSeq++;
+      const pkt = new Uint8Array(12 + i16.byteLength);
+      pkt.set(new Uint8Array(hdr), 0);
+      pkt.set(new Uint8Array(i16.buffer), 12);
+      fetch('/api/mic-receive', {
+        method:'POST', body:pkt,
+        headers:{'Content-Type':'application/octet-stream'},
+      }).catch(()=>{});
+    };
+
+    src.connect(_bmProc);
+    _bmProc.connect(_bmCtx.destination);
+    _bmOn = true;
+    document.getElementById('btn-browser-mic').textContent = '⏹ Stop My Mic';
+  } catch(e) {
+    toast('Mic access denied: ' + e.message);
+  }
+}
+
+function stopBrowserMic() {
+  _bmOn = false;
+  if (_bmProc)   { _bmProc.disconnect();  _bmProc = null; }
+  if (_bmStream) { _bmStream.getTracks().forEach(t => t.stop()); _bmStream = null; }
+  if (_bmCtx)    { _bmCtx.close();        _bmCtx  = null; }
+  document.getElementById('btn-browser-mic').textContent = '\u{1F3A4} Send My Mic';
+}
 </script>
 </body>
 </html>

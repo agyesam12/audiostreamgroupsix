@@ -8,8 +8,9 @@ import re
 import math
 import struct
 import time
+import queue as _queue
 
-from django.http import JsonResponse, FileResponse
+from django.http import JsonResponse, FileResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.shortcuts import render
 
@@ -79,6 +80,17 @@ MIC_PORT = 7000   # UDP port audio_server.py listens on
 RTSP_IP   = '127.0.0.1'
 RTSP_PORT = 8554
 RTP_PORT  = 6970
+
+# ── Server mic streaming state (laptop mic → phone browsers) ──────────────────
+_srv_mic_listeners      = []          # list of queue.Queue, one per connected phone
+_srv_mic_listeners_lock = threading.Lock()
+_srv_mic_active         = threading.Event()
+_srv_mic_thread         = None
+
+# ── Browser mic receive state (phone browser mic → laptop speakers) ───────────
+_browser_audio_q      = _queue.Queue(maxsize=400)
+_browser_player_thread = None
+_browser_player_started = False
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -255,6 +267,104 @@ def _ensure_all_wavs():
             _log(f'[SONG] "{song["title"]}" WAV ready', 'server')
         else:
             _log(f'[SONG] Convert failed for "{song["title"]}": {err}', 'error')
+
+
+# ── Server mic helpers ───────────────────────────────────────────────────────
+
+def _wav_header(rate=44100, channels=1, bits=16):
+    sz = 0x7FFFF000
+    h  = struct.pack('<4sI4s', b'RIFF', sz + 36, b'WAVE')
+    h += struct.pack('<4sIHHIIHH', b'fmt ', 16, 1, channels, rate,
+                    rate * channels * bits // 8, channels * bits // 8, bits)
+    h += struct.pack('<4sI', b'data', sz)
+    return h
+
+
+def _srv_mic_worker():
+    CHUNK = 1024
+
+    def _broadcast(raw):
+        with _srv_mic_listeners_lock:
+            for q in _srv_mic_listeners:
+                try:
+                    q.put_nowait(raw)
+                except _queue.Full:
+                    pass
+
+    try:
+        import pyaudio
+        pa     = pyaudio.PyAudio()
+        stream = pa.open(format=pyaudio.paInt16, channels=1,
+                         rate=44100, input=True, frames_per_buffer=CHUNK)
+        _log('[SRV MIC] Laptop mic live — phone users can listen', 'server')
+        while _srv_mic_active.is_set():
+            raw = stream.read(CHUNK, exception_on_overflow=False)
+            _broadcast(raw)
+        stream.stop_stream()
+        stream.close()
+        pa.terminate()
+        return
+    except ImportError:
+        pass
+    except Exception as e:
+        _log(f'[SRV MIC] pyaudio error: {e}', 'error')
+
+    try:
+        import sounddevice as sd
+        import numpy as np
+        _log('[SRV MIC] Laptop mic live (sounddevice)', 'server')
+        with sd.InputStream(samplerate=44100, channels=1,
+                            dtype='int16', blocksize=CHUNK) as stream:
+            while _srv_mic_active.is_set():
+                data, _ = stream.read(CHUNK)
+                _broadcast(data.tobytes())
+    except Exception as e:
+        _log(f'[SRV MIC] sounddevice error: {e}', 'error')
+
+
+def _browser_audio_player():
+    """Background thread — plays PCM chunks received from phone browsers."""
+    global _browser_player_started
+    try:
+        import pyaudio
+        pa     = pyaudio.PyAudio()
+        pa_out = pa.open(format=pyaudio.paInt16, channels=1,
+                         rate=44100, output=True, frames_per_buffer=1024)
+        _log('[BROWSER MIC] Ready to play phone mic audio', 'server')
+        while True:
+            raw = _browser_audio_q.get()
+            if raw is None:
+                break
+            pa_out.write(raw)
+        pa_out.stop_stream(); pa_out.close(); pa.terminate()
+        return
+    except ImportError:
+        pass
+    except Exception as e:
+        _log(f'[BROWSER MIC] pyaudio output error: {e}', 'error')
+
+    try:
+        import sounddevice as sd
+        import numpy as np
+        _log('[BROWSER MIC] Ready to play phone mic audio (sounddevice)', 'server')
+        while True:
+            raw = _browser_audio_q.get()
+            if raw is None:
+                break
+            arr = np.frombuffer(raw, dtype=np.int16)
+            sd.play(arr, samplerate=44100, blocking=True)
+    except Exception as e:
+        _log(f'[BROWSER MIC] sounddevice output error: {e}', 'error')
+
+
+def _ensure_browser_player():
+    global _browser_player_thread, _browser_player_started
+    if _browser_player_started:
+        return
+    _browser_player_started = True
+    _browser_player_thread = threading.Thread(
+        target=_browser_audio_player, daemon=True)
+    _browser_player_thread.start()
 
 
 # ── Views ─────────────────────────────────────────────────────────────────────

@@ -20,4 +20,10 @@ urlpatterns = [
     path('api/mic/server/stop',     views.mic_server_stop),
     path('api/mic/client/start',    views.mic_client_start),
     path('api/mic/client/stop',     views.mic_client_stop),
+    # Server mic → phone browser streaming
+    path('api/server-mic/start',    views.start_server_mic),
+    path('api/server-mic/stop',     views.stop_server_mic),
+    path('api/server-mic/stream',   views.server_mic_stream),
+    # Phone browser mic → laptop speakers
+    path('api/mic-receive',         views.mic_receive),
 ]
