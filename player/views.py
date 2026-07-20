@@ -793,6 +793,53 @@ def audio_serve(request):
     return FileResponse(open(audio_path, 'rb'), content_type='audio/wav')
 
 
+# ── Voice page ────────────────────────────────────────────────────────────────
+
+def voice_page(request):
+    return render(request, 'player/voice.html')
+
+
+# ── WebSocket relay server control ─────────────────────────────────────────────
+
+@csrf_exempt
+def ws_relay_start(request):
+    """Start ws_audio_relay.py — relays PCM audio between browser WebSocket clients."""
+    global _ws_relay_proc
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    with _lock:
+        if _ws_relay_proc and _ws_relay_proc.poll() is None:
+            return JsonResponse({'status': 'already_running', 'pid': _ws_relay_proc.pid})
+        script   = os.path.join(BASE_DIR, 'ws_audio_relay.py')
+        log_path = os.path.join(BASE_DIR, 'ws_relay.log')
+        log_fh   = open(log_path, 'w', encoding='utf-8')
+        env = os.environ.copy()
+        env['PYTHONIOENCODING'] = 'utf-8'
+        env['PYTHONUTF8']       = '1'
+        _ws_relay_proc = subprocess.Popen(
+            [sys.executable, '-u', script],
+            stdout=log_fh, stderr=log_fh,
+            cwd=BASE_DIR, env=env,
+        )
+        _log(f'[WS RELAY] Voice relay started  PID={_ws_relay_proc.pid}', 'server')
+        _log(f'[WS RELAY] Listening on ws://0.0.0.0:8765', 'server')
+    return JsonResponse({'status': 'started', 'pid': _ws_relay_proc.pid})
+
+
+@csrf_exempt
+def ws_relay_stop(request):
+    """Stop ws_audio_relay.py."""
+    global _ws_relay_proc
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    with _lock:
+        if _ws_relay_proc:
+            _ws_relay_proc.terminate()
+            _ws_relay_proc = None
+        _log('[WS RELAY] Voice relay stopped.', 'server')
+    return JsonResponse({'status': 'stopped'})
+
+
 # ── Server mic → phone browser (laptop mic live stream) ───────────────────────
 
 @csrf_exempt
