@@ -787,3 +787,75 @@ def audio_serve(request):
     if not os.path.exists(audio_path):
         _generate_wav(audio_path)
     return FileResponse(open(audio_path, 'rb'), content_type='audio/wav')
+
+
+# ── Server mic → phone browser (laptop mic live stream) ───────────────────────
+
+@csrf_exempt
+def start_server_mic(request):
+    """Start capturing laptop mic and streaming to any listening phone browsers."""
+    global _srv_mic_thread
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    if _srv_mic_active.is_set():
+        return JsonResponse({'status': 'already_running'})
+    _srv_mic_active.set()
+    _srv_mic_thread = threading.Thread(target=_srv_mic_worker, daemon=True)
+    _srv_mic_thread.start()
+    _log('[SRV MIC] Laptop mic started — phones can now listen', 'server')
+    return JsonResponse({'status': 'started'})
+
+
+@csrf_exempt
+def stop_server_mic(request):
+    """Stop capturing laptop mic."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    _srv_mic_active.clear()
+    _log('[SRV MIC] Laptop mic stopped', 'server')
+    return JsonResponse({'status': 'stopped'})
+
+
+def server_mic_stream(request):
+    """Streaming endpoint — phone browsers connect here to hear the laptop mic."""
+    q = _queue.Queue(maxsize=200)
+    with _srv_mic_listeners_lock:
+        _srv_mic_listeners.append(q)
+
+    def generate():
+        yield _wav_header()
+        try:
+            while True:
+                try:
+                    chunk = q.get(timeout=5)
+                    yield chunk
+                except _queue.Empty:
+                    if not _srv_mic_active.is_set():
+                        break
+        finally:
+            with _srv_mic_listeners_lock:
+                if q in _srv_mic_listeners:
+                    _srv_mic_listeners.remove(q)
+
+    return StreamingHttpResponse(generate(), content_type='audio/wav')
+
+
+# ── Phone browser mic → laptop speakers ───────────────────────────────────────
+
+@csrf_exempt
+def mic_receive(request):
+    """Phone browser POSTs raw PCM (optionally RTP-wrapped) here; we play it."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    data = request.body
+    if not data:
+        return JsonResponse({'ok': True})
+    # Strip 12-byte RTP header if present (version bits == 2)
+    if len(data) >= 12 and (data[0] >> 6) == 2:
+        data = data[12:]
+    _ensure_browser_player()
+    try:
+        _browser_audio_q.put_nowait(data)
+    except _queue.Full:
+        pass  # drop rather than block
+    return JsonResponse({'ok': True})

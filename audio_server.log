@@ -1,7 +1,7 @@
 [AUDIO SERVER] Audio output: pyaudio
 [AUDIO SERVER] Listening on UDP port 7000
 [AUDIO SERVER] Waiting for microphone audio from clients...
-[AUDIO SERVER] Stream from 127.0.0.1:55414
+[AUDIO SERVER] Stream from 127.0.0.1:57475
 [AUDIO SERVER] Packets: 100  Bytes: 204800
 [AUDIO SERVER] Packets: 200  Bytes: 409600
 [AUDIO SERVER] Packets: 300  Bytes: 614400
@@ -38,9 +38,3 @@
 [AUDIO SERVER] Packets: 3400  Bytes: 6963200
 [AUDIO SERVER] Packets: 3500  Bytes: 7168000
 [AUDIO SERVER] Packets: 3600  Bytes: 7372800
-[AUDIO SERVER] Packets: 3700  Bytes: 7577600
-[AUDIO SERVER] Packets: 3800  Bytes: 7782400
-[AUDIO SERVER] Packets: 3900  Bytes: 7987200
-[AUDIO SERVER] Packets: 4000  Bytes: 8192000
-[AUDIO SERVER] Packets: 4100  Bytes: 8396800
-[AUDIO SERVER] Packets: 4200  Bytes: 8601600
