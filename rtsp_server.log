@@ -3,10 +3,13 @@
 [SERVER] Waiting for clients...
 
 
-[RTSP] New connection from ('127.0.0.1', 64718)
-[RTSP] Connection closed: ('127.0.0.1', 64718)
+[RTSP] New connection from ('127.0.0.1', 54658)
+[RTSP] Connection closed: ('127.0.0.1', 54658)
 
-[RTSP] New connection from ('127.0.0.1', 64719)
+[RTSP] New connection from ('127.0.0.1', 54659)
+[RTSP] Connection closed: ('127.0.0.1', 54659)
+
+[RTSP] New connection from ('127.0.0.1', 54660)
 [RTSP] << DESCRIBE  (CSeq 1)
 [RTSP] >> RTSP/1.0 200 OK
 [RTSP] << SETUP  (CSeq 2)
@@ -16,5 +19,14 @@
 [RTP] Streaming -> 127.0.0.1:6970
 [RTSP] << PAUSE  (CSeq 4)
 [RTSP] >> RTSP/1.0 200 OK
-[RTSP] Connection closed: ('127.0.0.1', 64719)
-[RTP] Stream thread exited.
+[RTSP] << PLAY  (CSeq 5)
+[RTSP] >> RTSP/1.0 200 OK
+[RTP] Streaming -> 127.0.0.1:6970
+[RTSP] << PAUSE  (CSeq 6)
+[RTSP] >> RTSP/1.0 200 OK
+[RTSP] << PLAY  (CSeq 7)
+[RTSP] >> RTSP/1.0 200 OK
+[RTP] Streaming -> 127.0.0.1:6970
+[RTSP] << PAUSE  (CSeq 8)
+[RTSP] >> RTSP/1.0 200 OK
+[RTSP] Connection closed: ('127.0.0.1', 54660)
