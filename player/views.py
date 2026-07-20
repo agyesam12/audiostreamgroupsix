@@ -69,6 +69,7 @@ _state = {
 _server_proc     = None
 _mic_server_proc = None
 _mic_client_proc = None
+_ws_relay_proc   = None
 _rtsp_sock   = None
 _rtp_sock    = None
 _stop_rtp    = threading.Event()
@@ -632,6 +633,9 @@ def api_status(request):
         'packets_mic_sent': _state['packets_mic_sent'],
         'bytes_mic_sent':   _state['bytes_mic_sent'],
         'mic_client_ip':    _state['mic_client_ip'],
+        'srv_mic_running':  _srv_mic_active.is_set(),
+        'ws_relay_running': _ws_relay_proc is not None and _ws_relay_proc.poll() is None,
+        'ws_relay_pid':     _ws_relay_proc.pid if (_ws_relay_proc and _ws_relay_proc.poll() is None) else None,
     })
     return JsonResponse(data)
 

@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Voice — Group 6 Audio Stream</title>
+<style>
+:root{
+  --bg:#07070f;--surface:#0e0e1c;--card:#12122a;--card2:#191930;
+  --border:rgba(124,58,237,.22);
+  --primary:#7c3aed;--pri-glow:rgba(124,58,237,.45);
+  --cyan:#06b6d4;--cyan-glow:rgba(6,182,212,.4);
+  --green:#10b981;--red:#ef4444;--amber:#f59e0b;
+  --text:#e2e8f0;--muted:#64748b;--r:13px;
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  min-height:100vh;overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:
+    radial-gradient(ellipse 70% 50% at 10% 15%,rgba(6,182,212,.05) 0%,transparent 70%),
+    radial-gradient(ellipse 60% 50% at 90% 85%,rgba(124,58,237,.05) 0%,transparent 70%);
+}
+
+/* Header */
+header{
+  position:relative;z-index:20;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.9rem 2rem;
+  background:rgba(7,7,15,.85);backdrop-filter:blur(24px);
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;gap:.6rem;
+}
+.hd-left{display:flex;align-items:center;gap:.9rem}
+.logo-ring{
+  width:44px;height:44px;border-radius:50%;
+  border:2px solid var(--cyan);
+  display:flex;align-items:center;justify-content:center;
+  background:rgba(6,182,212,.12);
+  animation:rpulse 3s ease-in-out infinite;flex-shrink:0;
+}
+@keyframes rpulse{0%,100%{box-shadow:0 0 0 0 var(--cyan-glow)}50%{box-shadow:0 0 0 9px transparent}}
+.logo-ring svg{width:22px;height:22px;fill:var(--cyan)}
+.hd-title{font-size:1.05rem;font-weight:800;letter-spacing:.02em}
+.hd-sub{font-size:.72rem;color:var(--muted);margin-top:2px}
+.hd-right{display:flex;align-items:center;gap:.6rem;flex-wrap:wrap}
+.badge{padding:.28rem .7rem;border-radius:99px;font-size:.65rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase}
+.b-grp{background:rgba(236,72,153,.12);border:1px solid rgba(236,72,153,.3);color:#f9a8d4}
+.b-rfc{background:rgba(6,182,212,.12);border:1px solid rgba(6,182,212,.3);color:#67e8f9}
+.b-ws{background:rgba(16,185,129,.12);border:1px solid rgba(16,185,129,.3);color:#6ee7b7}
+.docs-link{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.28rem .75rem;border-radius:99px;
+  font-size:.65rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  background:rgba(232,162,42,.12);border:1px solid rgba(232,162,42,.4);
+  color:#e8a22a;text-decoration:none;transition:background .2s;
+}
+.docs-link:hover{background:rgba(232,162,42,.22)}
+
+/* WS status bar */
+.ws-bar{
+  position:relative;z-index:1;
+  display:flex;align-items:center;gap:.6rem;
+  padding:.55rem 2rem;
+  background:var(--surface);border-bottom:1px solid var(--border);
+  font-size:.75rem;
+}
+.ws-bar .sep{color:var(--border);margin:0 .3rem}
+
+/* Layout */
+.layout{
+  position:relative;z-index:1;
+  max-width:1200px;margin:0 auto;padding:1.2rem;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:1.2rem;
+}
+
+/* Cards */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:1.2rem;
+  position:relative;overflow:hidden;
+}
+.card-c2s{border-color:rgba(6,182,212,.3);background:linear-gradient(135deg,#12122a,#091820)}
+.card-s2c{border-color:rgba(124,58,237,.3)}
+.card-full{grid-column:1/-1}
+.card-title{
+  font-size:.67rem;font-weight:700;letter-spacing:.11em;text-transform:uppercase;
+  color:var(--muted);margin-bottom:1rem;
+  display:flex;align-items:center;gap:.45rem;
+}
+.ct-bar{width:3px;height:13px;border-radius:99px}
+.ct-c2s .ct-bar{background:var(--cyan)}
+.ct-s2c .ct-bar{background:var(--primary)}
+.ct-grn .ct-bar{background:var(--green)}
+
+/* Status row */
+.srv-status{
+  display:flex;align-items:center;gap:.55rem;
+  padding:.7rem .9rem;border-radius:9px;
+  background:var(--card2);border:1px solid var(--border);
+  margin-bottom:.9rem;font-size:.82rem;
+}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--red);flex-shrink:0;transition:background .4s}
+.dot.on-c2s{background:var(--cyan);box-shadow:0 0 8px var(--cyan);animation:dpulse-c 1.8s ease-in-out infinite}
+.dot.on-s2c{background:var(--primary);box-shadow:0 0 8px var(--primary);animation:dpulse-s 1.8s ease-in-out infinite}
+.dot.on-grn{background:var(--green);box-shadow:0 0 8px var(--green);animation:dpulse-g 1.8s ease-in-out infinite}
+.dot.off{background:var(--muted);box-shadow:none}
+@keyframes dpulse-c{0%,100%{box-shadow:0 0 0 0 rgba(6,182,212,.6)}50%{box-shadow:0 0 0 6px transparent}}
+@keyframes dpulse-s{0%,100%{box-shadow:0 0 0 0 rgba(124,58,237,.6)}50%{box-shadow:0 0 0 6px transparent}}
+@keyframes dpulse-g{0%,100%{box-shadow:0 0 0 0 rgba(16,185,129,.6)}50%{box-shadow:0 0 0 6px transparent}}
+.dot-label{font-weight:700}
+.dot-pid{font-size:.68rem;color:var(--muted);margin-left:auto;font-family:monospace}
+
+/* Buttons */
+.btn{
+  width:100%;padding:.62rem 1rem;border:none;border-radius:9px;
+  font-size:.8rem;font-weight:700;cursor:pointer;transition:all .2s;
+  margin-bottom:.45rem;display:flex;align-items:center;justify-content:center;gap:.45rem;
+}
+.btn-c2s{background:linear-gradient(135deg,#0891b2,#0e7490);color:#fff;box-shadow:0 4px 16px rgba(6,182,212,.3)}
+.btn-c2s:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 22px rgba(6,182,212,.45)}
+.btn-s2c{background:linear-gradient(135deg,#7c3aed,#5b21b6);color:#fff;box-shadow:0 4px 16px rgba(124,58,237,.32)}
+.btn-s2c:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 22px rgba(124,58,237,.44)}
+.btn-grn{background:linear-gradient(135deg,#059669,#047857);color:#fff;box-shadow:0 4px 16px rgba(16,185,129,.3)}
+.btn-grn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 22px rgba(16,185,129,.45)}
+.btn-danger{background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.28);color:#fca5a5}
+.btn-danger:hover:not(:disabled){background:rgba(239,68,68,.22)}
+.btn:disabled{opacity:.35;cursor:not-allowed;transform:none!important}
+
+/* Info rows */
+.si-row{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:.22rem 0;border-bottom:1px solid rgba(255,255,255,.04);
+  font-size:.7rem;color:var(--muted);
+}
+.si-row:last-child{border-bottom:none}
+.si-val-c{color:var(--cyan);font-family:'Courier New',monospace;font-size:.68rem}
+.si-val-s{color:var(--primary);font-family:'Courier New',monospace;font-size:.68rem}
+.si-val-g{color:var(--green);font-family:'Courier New',monospace;font-size:.68rem}
+
+/* Voice duplex card */
+.voice-halves{display:grid;grid-template-columns:1fr auto 1fr;gap:0;align-items:start}
+.voice-half{padding:.5rem}
+.voice-divider{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:1rem .8rem;gap:.6rem;color:var(--muted);font-size:.8rem;
+  border-left:1px solid var(--border);border-right:1px solid var(--border);
+  min-height:180px;
+}
+.voice-divider span{font-size:1.4rem}
+
+/* Level meter */
+.level-wrap{
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;padding:.6rem .8rem;margin-top:.7rem;
+}
+.level-label{font-size:.65rem;color:var(--muted);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.06em}
+.level-track{height:6px;background:rgba(255,255,255,.06);border-radius:3px;overflow:hidden}
+.level-bar{height:100%;width:0%;background:linear-gradient(90deg,var(--green),#34d399);border-radius:3px;transition:width .04s linear}
+
+/* Log */
+.log-body{
+  background:var(--card2);border-radius:9px;padding:.6rem;
+  height:130px;overflow-y:auto;font-family:'Courier New',monospace;font-size:.68rem;
+}
+.log-row{display:flex;gap:10px;padding:2px 4px;border-radius:4px}
+.log-row:hover{background:rgba(255,255,255,.03)}
+.log-ts{color:var(--muted);min-width:58px}
+
+/* How-to box */
+.how-to{
+  background:rgba(6,182,212,.06);border:1px solid rgba(6,182,212,.18);
+  border-radius:10px;padding:.8rem 1rem;font-size:.75rem;color:var(--muted);
+  line-height:1.65;margin-top:.8rem;
+}
+.how-to strong{color:var(--text)}
+
+/* Responsive */
+@media(max-width:800px){
+  .layout{grid-template-columns:1fr}
+  .card-full{grid-column:1}
+  .voice-halves{grid-template-columns:1fr;grid-template-rows:auto auto auto}
+  .voice-divider{flex-direction:row;min-height:auto;padding:.6rem;border:none;border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+  header{padding:.7rem 1rem}
+  .layout{padding:.8rem}
+}
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="hd-left">
+    <div class="logo-ring">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+    </div>
+    <div>
+      <div class="hd-title">Live Voice Communication</div>
+      <div class="hd-sub">WebSocket Real-Time Audio &nbsp;|&nbsp; Full Duplex &nbsp;|&nbsp; Group 6</div>
+    </div>
+  </div>
+  <div class="hd-right">
+    <a href="/" class="docs-link">← Dashboard</a>
+    <a href="/walkthrough" class="docs-link">Walkthrough</a>
+    <span class="badge b-grp">Group 6</span>
+    <span class="badge b-ws">WebSocket</span>
+    <span class="badge b-rfc">RFC&nbsp;3550</span>
+  </div>
+</header>
+
+<!-- WebSocket connection status bar -->
+<div class="ws-bar">
+  <span class="dot off" id="dot-ws"></span>
+  <span>WebSocket relay:</span>
+  <strong id="lbl-ws-conn">Connecting…</strong>
+  <span class="sep">|</span>
+  <span>Server:</span>
+  <strong id="lbl-ws-server" style="color:var(--muted)">ws://<span id="ws-host">…</span>:8765</strong>
+  <span class="sep" style="margin-left:auto"></span>
+  <span style="color:var(--muted);font-size:.7rem" id="lbl-clients">0 clients connected</span>
+</div>
+
+<div class="layout">
+
+  <!-- ── WebSocket Relay Card ──────────────────────────────────── -->
+  <div class="card card-c2s">
+    <div class="card-title ct-c2s"><div class="ct-bar"></div>Voice Relay Server <small style="font-size:.6rem;color:var(--muted);text-transform:none;font-weight:400">(run on laptop)</small></div>
+    <div class="srv-status">
+      <span class="dot off" id="dot-relay"></span>
+      <span class="dot-label" id="lbl-relay">Not running</span>
+      <span class="dot-pid" id="lbl-relay-port"></span>
+    </div>
+    <button class="btn btn-c2s" id="btn-start-relay" onclick="startRelay()">▶ Start Voice Relay</button>
+    <button class="btn btn-danger" id="btn-stop-relay" disabled onclick="stopRelay()">■ Stop Relay</button>
+    <div style="background:var(--card2);border-radius:9px;padding:.75rem .9rem;margin-top:.6rem">
+      <div class="si-row"><span>Protocol</span><span class="si-val-c">WebSocket / ws://</span></div>
+      <div class="si-row"><span>Port</span><span class="si-val-c">8765 / TCP</span></div>
+      <div class="si-row"><span>Audio format</span><span class="si-val-c">PCM 16-bit 44100Hz mono</span></div>
+      <div class="si-row"><span>Latency</span><span class="si-val-c">~40–80 ms on LAN</span></div>
+      <div class="si-row"><span>Echo cancellation</span><span class="si-val-c">Browser built-in</span></div>
+    </div>
+    <div class="how-to">
+      <strong>Laptop only:</strong> click <em>Start Voice Relay</em> once before any device tries to connect.
+      All devices must be on the <strong>same MiFi network</strong>.
+    </div>
+  </div>
+
+  <!-- ── RTSP Status Card ──────────────────────────────────────── -->
+  <div class="card card-s2c">
+    <div class="card-title ct-s2c"><div class="ct-bar"></div>RTSP Music Server <small style="font-size:.6rem;color:var(--muted);text-transform:none;font-weight:400">(from dashboard)</small></div>
+    <div class="srv-status">
+      <span class="dot off" id="dot-rtsp"></span>
+      <span class="dot-label" id="lbl-rtsp">Not running</span>
+    </div>
+    <div style="background:var(--card2);border-radius:9px;padding:.75rem .9rem;margin-top:.6rem">
+      <div class="si-row"><span>Protocol</span><span class="si-val-s">RTSP 1.0 / RFC 2326</span></div>
+      <div class="si-row"><span>Control port</span><span class="si-val-s">TCP 8554</span></div>
+      <div class="si-row"><span>Audio transport</span><span class="si-val-s">RTP/UDP 6970</span></div>
+      <div class="si-row"><span>Current song</span><span class="si-val-s" id="lbl-song">—</span></div>
+      <div class="si-row"><span>RTSP state</span><span class="si-val-s" id="lbl-rtsp-state">IDLE</span></div>
+      <div class="si-row"><span>RTP packets</span><span class="si-val-s" id="lbl-rtp-pkts">0</span></div>
+    </div>
+    <div class="how-to">
+      RTSP handles <strong>music streaming</strong> (server → client).
+      WebSocket handles <strong>voice calls</strong> (bidirectional).
+      Both run at the same time — open the <a href="/" style="color:var(--cyan)">Dashboard</a> to control music.
+    </div>
+  </div>
+
+  <!-- ── Full Duplex Voice Card ────────────────────────────────── -->
+  <div class="card card-full">
+    <div class="card-title ct-grn"><div class="ct-bar"></div>Full Duplex Voice &mdash; Speak &amp; Listen simultaneously</div>
+
+    <div class="voice-halves">
+
+      <!-- YOUR VOICE (outgoing) -->
+      <div class="voice-half">
+        <div class="card-title" style="margin-bottom:.6rem;font-size:.62rem;color:var(--cyan)">
+          🎤 YOUR MICROPHONE → ALL OTHERS
+        </div>
+        <div class="srv-status">
+          <span class="dot off" id="dot-talk"></span>
+          <span class="dot-label" id="lbl-talk">Mic off</span>
+        </div>
+        <button class="btn btn-grn" id="btn-talk" onclick="toggleTalk()">🎤 Start Talking</button>
+        <div class="level-wrap">
+          <div class="level-label">Outgoing level</div>
+          <div class="level-track"><div class="level-bar" id="level-out"></div></div>
+        </div>
+        <div style="background:var(--card2);border-radius:9px;padding:.75rem .9rem;margin-top:.7rem">
+          <div class="si-row"><span>Packets sent</span><span class="si-val-g" id="lbl-sent">0</span></div>
+          <div class="si-row"><span>Sample rate</span><span class="si-val-g">44100 Hz</span></div>
+          <div class="si-row"><span>Echo cancel</span><span class="si-val-g">ON (browser)</span></div>
+          <div class="si-row"><span>Noise suppression</span><span class="si-val-g">ON (browser)</span></div>
+        </div>
+      </div>
+
+      <!-- Divider -->
+      <div class="voice-divider">
+        <span>↔</span>
+        <small style="writing-mode:vertical-lr;text-orientation:mixed;letter-spacing:.1em;font-size:.6rem;text-transform:uppercase">Full Duplex</small>
+        <span>↔</span>
+      </div>
+
+      <!-- INCOMING VOICE -->
+      <div class="voice-half">
+        <div class="card-title" style="margin-bottom:.6rem;font-size:.62rem;color:var(--primary)">
+          🔊 INCOMING → YOUR SPEAKERS (auto)
+        </div>
+        <div class="srv-status">
+          <span class="dot off" id="dot-recv"></span>
+          <span class="dot-label" id="lbl-recv">Waiting for others</span>
+        </div>
+        <div style="background:rgba(124,58,237,.06);border:1px solid rgba(124,58,237,.18);border-radius:9px;padding:.7rem .9rem;font-size:.75rem;color:var(--muted);margin-bottom:.7rem">
+          Incoming audio plays <strong style="color:var(--text)">automatically</strong> when others talk.<br>
+          Tap any button first to unlock audio in your browser.
+        </div>
+        <div class="level-wrap">
+          <div class="level-label">Incoming level</div>
+          <div class="level-track"><div class="level-bar" id="level-in" style="background:linear-gradient(90deg,var(--primary),#a78bfa)"></div></div>
+        </div>
+        <div style="background:var(--card2);border-radius:9px;padding:.75rem .9rem;margin-top:.7rem">
+          <div class="si-row"><span>Packets received</span><span class="si-val-s" id="lbl-recv-pkts">0</span></div>
+          <div class="si-row"><span>Playback</span><span class="si-val-s">Scheduled AudioContext</span></div>
+          <div class="si-row"><span>Buffer ahead</span><span class="si-val-s">40 ms</span></div>
+          <div class="si-row"><span>Jitter handling</span><span class="si-val-s">Time-domain scheduling</span></div>
+        </div>
+      </div>
+
+    </div><!-- /voice-halves -->
+  </div><!-- /voice card -->
+
+  <!-- ── Activity Log ──────────────────────────────────────────── -->
+  <div class="card card-full">
+    <div class="card-title ct-grn" style="margin-bottom:.7rem">
+      <div class="ct-bar"></div>Activity Log
+      <button onclick="document.getElementById('log').innerHTML=''" style="margin-left:auto;background:none;border:1px solid var(--border);color:var(--muted);border-radius:6px;padding:.15rem .5rem;font-size:.65rem;cursor:pointer">Clear</button>
+    </div>
+    <div class="log-body" id="log"></div>
+  </div>
+
+</div><!-- /layout -->
+
+<script>
+// ── Config ────────────────────────────────────────────────────────────────────
+const WS_PORT  = 8765;
+const CHUNK    = 1024;      // samples per ScriptProcessor block
+const RATE     = 44100;
+const LOOKAHEAD = 0.04;     // seconds ahead to schedule playback (reduces gaps)
+
+// ── State ─────────────────────────────────────────────────────────────────────
+let ws         = null;
+let wsReady    = false;
+
+let micStream  = null;
+let sendCtx    = null;
+let processor  = null;
+let analyser   = null;
+let isTalking  = false;
+let sentPkts   = 0;
+let levelRaf   = null;
+
+let playCtx    = null;
+let playUnlocked = false;
+let nextTime   = 0;
+let recvPkts   = 0;
+let recvLevel  = 0;
+
+// ── Log ───────────────────────────────────────────────────────────────────────
+const LOG_COLORS = { info:'#e2e8f0', server:'#06b6d4', client:'#10b981', error:'#ef4444', ws:'#a78bfa' };
+function addLog(msg, cls='info') {
+    const ts = new Date().toTimeString().slice(0,8);
+    const log = document.getElementById('log');
+    const c = LOG_COLORS[cls] || '#e2e8f0';
+    log.innerHTML += `<div class="log-row"><span class="log-ts">${ts}</span><span style="color:${c}">${msg}</span></div>`;
+    log.scrollTop = log.scrollHeight;
+}
+
+// ── Dot helpers ───────────────────────────────────────────────────────────────
+function setDot(id, type) {
+    const d = document.getElementById(id);
+    d.className = 'dot';
+    if      (type === 'c2s') d.classList.add('on-c2s');
+    else if (type === 's2c') d.classList.add('on-s2c');
+    else if (type === 'grn') d.classList.add('on-grn');
+    else                     d.classList.add('off');
+}
+
+// ── AudioContext (must be created/resumed after user gesture) ─────────────────
+function unlockAudio() {
+    if (playUnlocked) return;
+    playCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: RATE });
+    if (playCtx.state === 'suspended') playCtx.resume();
+    playUnlocked = true;
+    nextTime = 0;
+    addLog('Audio context unlocked — incoming voice will now play', 'info');
+}
+
+// ── WebSocket connection ──────────────────────────────────────────────────────
+function connectWs() {
+    const host = window.location.hostname;
+    document.getElementById('ws-host').textContent = host;
+    const url = `ws://${host}:${WS_PORT}`;
+
+    try { ws = new WebSocket(url); } catch(e) { retryWs(); return; }
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => {
+        wsReady = true;
+        setDot('dot-ws', 'c2s');
+        document.getElementById('lbl-ws-conn').textContent = 'Connected';
+        document.getElementById('lbl-ws-conn').style.color = 'var(--cyan)';
+        addLog(`WebSocket connected → ${url}`, 'ws');
+    };
+
+    ws.onclose = () => {
+        wsReady = false;
+        setDot('dot-ws', 'off');
+        document.getElementById('lbl-ws-conn').textContent = 'Disconnected — retrying…';
+        document.getElementById('lbl-ws-conn').style.color = 'var(--red)';
+        retryWs();
+    };
+
+    ws.onerror = () => { /* onclose fires too */ };
+
+    ws.onmessage = (e) => {
+        if (!(e.data instanceof ArrayBuffer)) return;
+        playIncoming(new Int16Array(e.data));
+    };
+}
+
+function retryWs() { setTimeout(connectWs, 3000); }
+
+// ── Talk: send mic audio over WebSocket ───────────────────────────────────────
+async function toggleTalk() {
+    unlockAudio(); // must happen on user gesture
+    if (!isTalking) await startTalking(); else stopTalking();
+}
+
+async function startTalking() {
+    if (!wsReady) { addLog('Not connected to relay — start the relay first', 'error'); return; }
+    try {
+        micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation:true, noiseSuppression:true, autoGainControl:true },
+            video: false
+        });
+        sendCtx  = new AudioContext({ sampleRate: RATE });
+        const src = sendCtx.createMediaStreamSource(micStream);
+        analyser = sendCtx.createAnalyser();
+        analyser.fftSize = 512;
+        processor = sendCtx.createScriptProcessor(CHUNK, 1, 1);
+
+        src.connect(analyser);
+        analyser.connect(processor);
+        processor.connect(sendCtx.destination);
+
+        processor.onaudioprocess = (e) => {
+            if (!ws || ws.readyState !== WebSocket.OPEN) return;
+            const f32 = e.inputBuffer.getChannelData(0);
+            const i16 = new Int16Array(f32.length);
+            for (let i = 0; i < f32.length; i++) {
+                const s = Math.max(-1, Math.min(1, f32[i]));
+                i16[i] = s < 0 ? s * 32768 : s * 32767;
+            }
+            ws.send(i16.buffer);
+            sentPkts++;
+            document.getElementById('lbl-sent').textContent = sentPkts;
+        };
+
+        isTalking = true;
+        document.getElementById('btn-talk').textContent = '⏹ Stop Talking';
+        document.getElementById('btn-talk').className = 'btn btn-danger';
+        setDot('dot-talk', 'grn');
+        document.getElementById('lbl-talk').textContent = 'Transmitting…';
+        startLevelMeter();
+        addLog('Microphone active — your voice is being sent to all connected devices', 'client');
+    } catch (err) {
+        addLog('Mic error: ' + err.message, 'error');
+    }
+}
+
+function stopTalking() {
+    if (processor)  { processor.disconnect(); processor = null; }
+    if (analyser)   { analyser.disconnect();  analyser = null; }
+    if (micStream)  { micStream.getTracks().forEach(t => t.stop()); micStream = null; }
+    if (sendCtx)    { sendCtx.close().catch(()=>{}); sendCtx = null; }
+    if (levelRaf)   { cancelAnimationFrame(levelRaf); levelRaf = null; }
+    isTalking = false;
+    document.getElementById('btn-talk').textContent = '🎤 Start Talking';
+    document.getElementById('btn-talk').className = 'btn btn-grn';
+    document.getElementById('level-out').style.width = '0%';
+    setDot('dot-talk', 'off');
+    document.getElementById('lbl-talk').textContent = 'Mic off';
+    addLog('Microphone stopped', 'client');
+}
+
+// ── Level meter animation ─────────────────────────────────────────────────────
+function startLevelMeter() {
+    const buf = new Uint8Array(analyser.fftSize);
+    function tick() {
+        if (!analyser) return;
+        analyser.getByteTimeDomainData(buf);
+        let peak = 0;
+        for (let i = 0; i < buf.length; i++) {
+            const v = Math.abs((buf[i] - 128) / 128);
+            if (v > peak) peak = v;
+        }
+        document.getElementById('level-out').style.width = Math.min(100, peak * 120).toFixed(1) + '%';
+        levelRaf = requestAnimationFrame(tick);
+    }
+    tick();
+}
+
+// ── Incoming audio: scheduled gapless playback ────────────────────────────────
+function playIncoming(int16Data) {
+    if (!playUnlocked || !playCtx) return;
+
+    const f32 = new Float32Array(int16Data.length);
+    for (let i = 0; i < int16Data.length; i++) {
+        f32[i] = int16Data[i] / 32768;
+    }
+
+    const buf = playCtx.createBuffer(1, f32.length, RATE);
+    buf.copyToChannel(f32, 0);
+
+    const src = playCtx.createBufferSource();
+    src.buffer = buf;
+    src.connect(playCtx.destination);
+
+    const now = playCtx.currentTime;
+    // If we're behind (gap), jump forward with a small safety buffer
+    if (nextTime < now + LOOKAHEAD) nextTime = now + LOOKAHEAD;
+    src.start(nextTime);
+    nextTime += buf.duration;
+
+    recvPkts++;
+    document.getElementById('lbl-recv-pkts').textContent = recvPkts;
+    setDot('dot-recv', 's2c');
+    document.getElementById('lbl-recv').textContent = 'Receiving audio';
+
+    // Incoming level meter (peak from float32 samples)
+    let peak = 0;
+    for (let i = 0; i < f32.length; i++) { const v = Math.abs(f32[i]); if (v > peak) peak = v; }
+    recvLevel = Math.max(recvLevel * 0.85, peak);
+    document.getElementById('level-in').style.width = Math.min(100, recvLevel * 120).toFixed(1) + '%';
+}
+
+// Decay incoming level when nothing is arriving
+setInterval(() => {
+    recvLevel *= 0.9;
+    if (recvLevel < 0.01) {
+        recvLevel = 0;
+        document.getElementById('level-in').style.width = '0%';
+    }
+}, 100);
+
+// ── Relay server API calls ─────────────────────────────────────────────────────
+async function startRelay() {
+    unlockAudio();
+    try {
+        const r = await fetch('/api/ws/start', { method: 'POST' });
+        const d = await r.json();
+        if (d.error) addLog('Relay error: ' + d.error, 'error');
+        else         addLog('Voice relay started on port 8765', 'server');
+    } catch(e) { addLog('Could not start relay: ' + e.message, 'error'); }
+}
+
+async function stopRelay() {
+    try {
+        await fetch('/api/ws/stop', { method: 'POST' });
+        addLog('Voice relay stopped', 'server');
+    } catch(e) {}
+}
+
+// ── Status polling ────────────────────────────────────────────────────────────
+async function poll() {
+    try {
+        const r = await fetch('/api/status');
+        const d = await r.json();
+
+        // WS relay
+        const wsRun = !!d.ws_relay_running;
+        setDot('dot-relay', wsRun ? 'c2s' : 'off');
+        document.getElementById('lbl-relay').textContent = wsRun ? 'Running on port 8765' : 'Not running';
+        document.getElementById('lbl-relay-port').textContent = wsRun ? `PID ${d.ws_relay_pid || '—'}` : '';
+        document.getElementById('btn-start-relay').disabled = wsRun;
+        document.getElementById('btn-stop-relay').disabled  = !wsRun;
+
+        // RTSP music server
+        const rtspRun = !!d.server_running;
+        setDot('dot-rtsp', rtspRun ? 's2c' : 'off');
+        document.getElementById('lbl-rtsp').textContent = rtspRun
+            ? `Playing: ${d.song_title || '—'} — ${d.song_artist || '—'}`
+            : 'Not running';
+        if (d.song_title) document.getElementById('lbl-song').textContent = `${d.song_title} · ${d.song_artist}`;
+        if (d.rtsp_state) document.getElementById('lbl-rtsp-state').textContent = d.rtsp_state;
+        if (d.packets_received != null) document.getElementById('lbl-rtp-pkts').textContent = d.packets_received;
+
+        // Incoming receive dot: fade if no recent packets
+        if (!wsReady || recvPkts === 0) {
+            setDot('dot-recv', 'off');
+            if (recvPkts === 0) document.getElementById('lbl-recv').textContent = 'Waiting for others';
+        }
+
+    } catch(e) {}
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+connectWs();
+poll();
+setInterval(poll, 2500);
+addLog('Voice page ready — connect all devices to the same MiFi network', 'info');
+addLog('Laptop: click Start Voice Relay first, then all devices can talk', 'info');
+</script>
+
+</body>
+</html>
