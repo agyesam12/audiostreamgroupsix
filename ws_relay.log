@@ -1,4 +1,4 @@
 [WS RELAY] WebSocket audio relay listening on port 8765
 [WS RELAY] Browsers connect to  ws://YOUR_IP:8765
-[WS RELAY] + Connected  127.0.0.1:51060  total=1
-[WS RELAY] + Connected  192.168.8.24:40740  total=2
+[WS RELAY] + Connected  127.0.0.1:59149  total=1
+[WS RELAY] + Connected  192.168.8.24:52600  total=2
